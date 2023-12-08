@@ -1,0 +1,279 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "gpu-docker-api",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "容器"
+    },
+    {
+      "name": "卷"
+    }
+  ],
+  "paths": {
+    "/api/v1/containers": {
+      "post": {
+        "summary": "创建GPU容器",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              },
+              "example": "{\n    \"imageName\": \"nvidia/cuda:10.0-base\",\n    \"gpuNumbers\": [],\n    \"cardless\": false,\n    \"binds\": [\n        {\n            \"src\": \"/usr/local/bar\",\n            \"dest\": \"/usr/local/bar\"\n        },\n        {\n            \"src\": \"foo\",\n            \"dest\": \"/root/foo\"\n        }\n    ]\n}"
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apifox-orders": [],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130898951-run"
+      }
+    },
+    "/api/v1/containers/07343ac75f10f15e167f21b9ef03f27cef24cdc61f1798b6d2696cfab34d4a48/execute": {
+      "post": {
+        "summary": "exec",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "cmd": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "cmd"
+                ],
+                "x-apifox-orders": [
+                  "cmd"
+                ],
+                "x-apifox-ignore-properties": []
+              },
+              "example": {
+                "cmd": [
+                  "nvidia-smi"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apifox-orders": [],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130898952-run"
+      }
+    },
+    "/api/v1/containers/b740d94d09a2370c80f1b9043a64ce5d14a4e096f47d9813a20192fa1169e4bb": {
+      "delete": {
+        "summary": "删除容器",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apifox-orders": [],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130898953-run"
+      }
+    },
+    "/api/v1/volumes": {
+      "post": {
+        "summary": "创建卷",
+        "x-apifox-folder": "卷",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "卷"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apifox-orders": [],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130898954-run"
+      }
+    },
+    "/api/v1/volumes/foo": {
+      "delete": {
+        "summary": "删除卷",
+        "x-apifox-folder": "卷",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "卷"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apifox-orders": [],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130958812-run"
+      }
+    },
+    "/api/v1/containers/bar/dick": {
+      "put": {
+        "summary": "容器重命名",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apifox-orders": [],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-131334394-run"
+      }
+    },
+    "/api/v1/containers/foo-0/gpu": {
+      "patch": {
+        "summary": "更改 GPU 配置",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              },
+              "example": "{\n    \"imageName\": \"nvidia/cuda:10.0-base\",\n    \"gpuNumbers\": [],\n    \"cardless\": false,\n    \"binds\": [\n        {\n            \"src\": \"/usr/local/bar\",\n            \"dest\": \"/usr/local/bar\"\n        },\n        {\n            \"src\": \"foo\",\n            \"dest\": \"/root/foo\"\n        }\n    ]\n}"
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apifox-orders": [],
+                  "x-apifox-ignore-properties": []
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-131511375-run"
+      }
+    }
+  },
+  "components": {
+    "schemas": {}
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:2378",
+      "description": "Develop Env"
+    }
+  ]
+}
