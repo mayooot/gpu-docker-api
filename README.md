@@ -22,7 +22,7 @@
 }
 ~~~
 
-然后调用升降 GPU 容器的接口：/api/v1/containers/${container_name}/gpu，载荷：
+然后调用升降 GPU 容器的接口：`/api/v1/containers/${container_name}/gpu`，载荷：
 ~~~json
 {
     "gpuCount": 3

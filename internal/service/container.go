@@ -264,7 +264,6 @@ func (cs *ContainerService) copyMergedDirToContainer(task *copyTask) error {
 func copyDiffFromOldVersion(src, dest string) error {
 	startT := time.Now()
 	command := fmt.Sprintf(cpRFPOption, src, dest)
-	fmt.Println(command)
 	if err := cmd.NewCommand(command).Execute(); err != nil {
 		return errors.Wrapf(err, "service.copyDiffFromOldVersion, src:%s, dest: %s", src, dest)
 	}
