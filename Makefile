@@ -9,13 +9,14 @@ BIN_DIR=${CURRENT_DIR}/bin
 
 LDFLAGS = -ldflags "-w -s"
 
-linux:
-	cd ${BUILD_DIR}; \
+build:
+	@cd ${BUILD_DIR}; \
 	GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${BIN_DIR}/${BINARY}-linux-${GOARCH} . ; \
 	cd - >/dev/null
 
 fmt:
 	gofmt -l -w .
+
 imports:
 	goimports -l -w -local github.com/${GITHUB_USER}/${BINARY} .
 

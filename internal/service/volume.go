@@ -37,7 +37,7 @@ func (vs *VolumeService) DeleteVolume(name *string) error {
 	ctx := context.Background()
 	err := docker.Cli.VolumeRemove(ctx, *name, true)
 	if err != nil {
-		return errors.Wrapf(err, "failed to remove volume, name: %s", *name)
+		return errors.Wrapf(err, "service.DeleteVolume failed, name: %s", *name)
 	}
 
 	log.Infof("volume deleted successfully, name: %s", *name)
