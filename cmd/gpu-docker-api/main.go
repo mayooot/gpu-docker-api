@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"syscall"
 
@@ -15,14 +16,23 @@ import (
 	"github.com/ngaut/log"
 )
 
+var (
+	BRANCH     string
+	VERSION    string
+	COMMIT     string
+	GO_VERSION string
+	BUILD_TIME string
+)
+
 type program struct {
 	ctx context.Context
 	wg  sync.WaitGroup
 }
 
 func main() {
+	fmt.Printf("GPU-DOCKER-API\n BRANCH: %s\n Version: %s\n COMMIT: %s\n GO_VERSION: %s\n BUILD_TIME: %s\n\n", BRANCH, VERSION, COMMIT, GO_VERSION, BUILD_TIME)
 	prg := &program{}
-	if err := svc.Run(prg, syscall.SIGUSR1, syscall.SIGINT, syscall.SIGTERM); err != nil {
+	if err := svc.Run(prg, syscall.SIGINT, syscall.SIGTERM); err != nil {
 		log.Fatal(err)
 	}
 }

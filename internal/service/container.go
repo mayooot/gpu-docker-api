@@ -233,7 +233,6 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 	return id, newContainerName, err
 }
 
-// id: 容器 id 或者是容器 name
 func (cs *ContainerService) containerGraphDriverDataMergedDir(id string) (string, error) {
 	ctx := context.Background()
 	resp, err := docker.Cli.ContainerInspect(ctx, id)
@@ -243,7 +242,6 @@ func (cs *ContainerService) containerGraphDriverDataMergedDir(id string) (string
 	return resp.GraphDriver.Data["MergedDir"], nil
 }
 
-// 获取旧容器的 diff 目录，拷贝到新容器中
 func (cs *ContainerService) copyMergedDirToContainer(task *copyTask) error {
 	oldDiff, err := cs.containerGraphDriverDataMergedDir(task.OldContainerName)
 	if err != nil {
@@ -254,14 +252,14 @@ func (cs *ContainerService) copyMergedDirToContainer(task *copyTask) error {
 		return errors.WithMessage(err, "service.copyDiffToContainer")
 	}
 
-	if err = copyDiffFromOldVersion(oldDiff, newDiff); err != nil {
+	if err = copyMergedDirFromOldVersion(oldDiff, newDiff); err != nil {
 		return errors.WithMessage(err, "service.copyDiffToContainer")
 	}
 
 	return nil
 }
 
-func copyDiffFromOldVersion(src, dest string) error {
+func copyMergedDirFromOldVersion(src, dest string) error {
 	startT := time.Now()
 	command := fmt.Sprintf(cpRFPOption, src, dest)
 	if err := cmd.NewCommand(command).Execute(); err != nil {
