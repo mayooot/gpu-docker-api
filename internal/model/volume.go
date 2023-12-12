@@ -9,3 +9,7 @@ type VolumeCreate struct {
 	Name string `json:"name,omitempty"`
 	Size string `json:"size,omitempty"`
 }
+
+type VolumeSize struct {
+	Size string `json:"size"`
+}

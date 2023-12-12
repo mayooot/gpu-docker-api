@@ -2,8 +2,6 @@ package etcd
 
 import (
 	"context"
-	"strings"
-
 	cmap "github.com/orcaman/concurrent-map/v2"
 
 	"github.com/pkg/errors"
@@ -14,30 +12,23 @@ import (
 // value：etcd 中的 mod_revision
 var containerModRevisionMap = cmap.New[int64]()
 
-type KeyValue struct {
-	Key   *string
-	Value *string
-}
+const ContainerPrefix = "/apis/v1/containers"
 
 func PutContainerInfo(ctx context.Context, key, value *string) error {
-	resp, err := cli.Put(ctx, containerRealName(*key), *value)
+	resp, err := cli.Put(ctx, resourcePrefix(ContainerPrefix, realName(*key)), *value)
 	if err != nil {
-		return errors.Wrapf(err, "failed to put container info to etcd, key: %s", *key)
+		return errors.Wrapf(err, "etcd.PutContainerInfo key: %s", *key)
 	}
 	containerModRevisionMap.Set(*key, resp.Header.Revision)
 	return nil
 }
 
 func GetContainerInfo(ctx context.Context, key string) (bytes []byte, err error) {
-	resp, err := cli.Get(ctx, containerRealName(key))
+	resp, err := cli.Get(ctx, resourcePrefix(ContainerPrefix, realName(key)))
 	if err != nil {
-		return bytes, errors.Wrapf(err, "failed to get container info from etcd, key: %s", key)
+		return bytes, errors.Wrapf(err, "etcd.GetContainerInfo key: %s", key)
 	}
 
 	bytes = resp.Kvs[0].Value
 	return bytes, err
-}
-
-func containerRealName(key string) string {
-	return strings.Split(key, "-")[0]
 }

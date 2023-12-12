@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/pkg/errors"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -19,6 +20,7 @@ func (ch *ContainerHandler) RegisterRoute(g *gin.RouterGroup) {
 	g.DELETE("/containers/:name", ch.delete)
 	g.POST("/containers/:name/execute", ch.execute)
 	g.PATCH("/containers/:name/gpu", ch.patchGpuInfo)
+	g.PATCH("/containers/:name/volume", ch.pathVolumeInfo)
 }
 
 func (ch *ContainerHandler) run(c *gin.Context) {
@@ -43,13 +45,17 @@ func (ch *ContainerHandler) run(c *gin.Context) {
 
 	if strings.Contains(spec.ContainerName, "-") {
 		log.Error("failed to create container, container name container '-'")
-		ResponseError(c, CodeContainerImageNotNull)
+		ResponseError(c, CodeContainerNameNotContainsSpecialChar)
 		return
 	}
 
 	id, containerName, err := cs.RunGpuContainer(&spec)
 	if err != nil {
 		log.Error(err.Error())
+		if errors.Is(err, service.ErrorContainerExisted) {
+			ResponseError(c, CodeContainerExisted)
+			return
+		}
 		ResponseError(c, CodeContainerRunFailed)
 		return
 	}
@@ -113,7 +119,6 @@ func (ch *ContainerHandler) execute(c *gin.Context) {
 	ResponseSuccess(c, resp)
 }
 
-// foo-0
 func (ch *ContainerHandler) patchGpuInfo(c *gin.Context) {
 	name := c.Param("name")
 	if len(name) == 0 {
@@ -135,6 +140,39 @@ func (ch *ContainerHandler) patchGpuInfo(c *gin.Context) {
 	}
 
 	id, containerName, err := cs.PatchContainerGpuInfo(name, &spec)
+	if err != nil {
+		log.Error(err.Error())
+		ResponseError(c, CodeContainerPatchGpuInfoFailed)
+		return
+	}
+
+	ResponseSuccess(c, gin.H{
+		"id":   id,
+		"name": containerName,
+	})
+}
+
+func (ch *ContainerHandler) pathVolumeInfo(c *gin.Context) {
+	name := c.Param("name")
+	if len(name) == 0 {
+		log.Error("failed to patch container volume info, name is empty")
+		ResponseError(c, CodeContainerNameNotNull)
+		return
+	}
+
+	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
+		log.Error("failed to patch container volume info, name must be in format: name-version")
+		ResponseError(c, CodeContainerNameMustContainVersion)
+	}
+
+	var spec model.ContainerVolumePatch
+	if err := c.ShouldBindJSON(&spec); err != nil {
+		log.Error("failed to patch container volume info, error:", err.Error())
+		ResponseError(c, CodeInvalidParams)
+		return
+	}
+
+	id, containerName, err := cs.PatchContainerVolumeInfo(name, &spec)
 	if err != nil {
 		log.Error(err.Error())
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)

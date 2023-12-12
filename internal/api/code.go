@@ -19,10 +19,14 @@ const (
 	CodeContainerDeleteFailed
 	CodeContainerExecuteFailed
 	CodeContainerPatchGpuInfoFailed
+	CodeContainerExisted
+	CodeContainerPatchVolumeInfoFailed
 
 	CodeVolumeCreateFailed
 	CodeVolumeNameNotNull
 	CodeVolumeDeleteFailed
+	CodeVolumeExisted
+	CodeVolumeNameMustContainVersion
 )
 
 var codeMsgMap = map[ResCode]string{
@@ -42,10 +46,14 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerDeleteFailed:               "容器删除失败",
 	CodeContainerExecuteFailed:              "容器执行失败",
 	CodeContainerPatchGpuInfoFailed:         "更新容器 GPU 配置失败",
+	CodeContainerExisted:                    "容器已存在",
+	CodeContainerPatchVolumeInfoFailed:      "更新容器挂载卷配置失败",
 
-	CodeVolumeCreateFailed: "卷创建失败",
-	CodeVolumeNameNotNull:  "卷名不能为空",
-	CodeVolumeDeleteFailed: "卷删除失败",
+	CodeVolumeCreateFailed:           "卷创建失败",
+	CodeVolumeNameNotNull:            "卷名不能为空",
+	CodeVolumeDeleteFailed:           "卷删除失败",
+	CodeVolumeExisted:                "卷已存在",
+	CodeVolumeNameMustContainVersion: "卷名必须包含版本号",
 }
 
 func (c ResCode) Msg() string {

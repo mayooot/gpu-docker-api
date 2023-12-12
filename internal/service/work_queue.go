@@ -12,7 +12,10 @@ import (
 const _maxContainerCount = 110
 
 var WorkQueue chan interface{}
-var cs ContainerService
+var (
+	cs ContainerService
+	vs VolumeService
+)
 
 func InitWorkQueue() {
 	WorkQueue = make(chan interface{}, _maxContainerCount)
@@ -25,27 +28,56 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 		select {
 		case v := <-WorkQueue:
 			switch v := v.(type) {
-			case etcd.KeyValue:
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					if err := etcd.PutContainerInfo(ctx, v.Key, v.Value); err != nil {
-						log.Error(err.Error())
-						WorkQueue <- v
-						return
-					}
-					log.Infof("put to etcd successfully, key: %s, value: %s", *v.Key, *v.Value)
-				}()
+			case etcd.PutKeyValue:
+				switch v.Resource {
+				case etcd.ContainerPrefix:
+					go func() {
+						wg.Add(1)
+						defer wg.Done()
+						if err := etcd.PutContainerInfo(ctx, v.Key, v.Value); err != nil {
+							log.Error(err.Error())
+							WorkQueue <- v
+							return
+						}
+						log.Infof("put to etcd successfully, key: %s, value: %s", *v.Key, *v.Value)
+					}()
+				case etcd.VolumePrefix:
+					go func() {
+						wg.Add(1)
+						defer wg.Done()
+						if err := etcd.PutVolumeInfo(ctx, v.Key, v.Value); err != nil {
+							log.Error(err.Error())
+							WorkQueue <- v
+							return
+						}
+						log.Infof("put to etcd successfully, key: %s, value: %s", *v.Key, *v.Value)
+					}()
+				default:
+					// do nothing
+				}
 			case *copyTask:
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					if err := cs.copyMergedDirToContainer(v); err != nil {
-						log.Error(err.Error())
-						return
-					}
-					log.Infof("copy diff to container successfully, task: %+v", *v)
-				}()
+				switch v.Resource {
+				case etcd.ContainerPrefix:
+					go func() {
+						wg.Add(1)
+						defer wg.Done()
+						if err := cs.copyMergedDirToContainer(v); err != nil {
+							log.Error(err.Error())
+							return
+						}
+						log.Infof("copy merged to volume successfully, task: %+v", *v)
+					}()
+				case etcd.VolumePrefix:
+					go func() {
+						wg.Add(1)
+						defer wg.Done()
+						if err := vs.copyMountpointToContainer(v); err != nil {
+							log.Error(err.Error())
+							return
+						}
+						log.Infof("copy mountpoint to volume successfully, task: %+v", *v)
+					}()
+				}
 			default:
 				//	nothing to do
 			}

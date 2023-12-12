@@ -1,5 +1,7 @@
 package model
 
+import "github.com/docker/docker/api/types/mount"
+
 type ContainerRun struct {
 	ImageName     string   `json:"imageName"`
 	ContainerName string   `json:"containerName"`
@@ -20,4 +22,9 @@ type ContainerRename struct {
 
 type ContainerGpuPatch struct {
 	GpuCount int `json:"gpuCount"`
+}
+type ContainerVolumePatch struct {
+	Type          mount.Type `json:"type"`
+	OldVolumeName string     `json:"oldVolumeName"`
+	NewVolumeName string     `json:"newVolumeName"`
 }
