@@ -43,7 +43,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 
 	ctx := context.Background()
 	if cs.existContainer(spec.ContainerName) {
-		return id, containerName, errors.Wrapf(ErrorContainerExisted, "service.RunGpuContainer failed, container %s", spec.ContainerName)
+		return id, containerName, errors.Wrapf(ErrorContainerExisted, "container %s", spec.ContainerName)
 	}
 
 	config = container.Config{
@@ -108,7 +108,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 		Platform:         &platform,
 	})
 	if err != nil {
-		return id, containerName, errors.Wrapf(err, "service.RunGpuContainer failed, spec: %+v", spec)
+		return id, containerName, errors.Wrapf(err, "serivce.runContainer failed, spec: %+v", spec)
 	}
 	return id, containerName, err
 }
@@ -126,7 +126,7 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 	containerName = fmt.Sprintf("%s-%d", name, version)
 	resp, err := docker.Cli.ContainerCreate(ctx, info.Config, info.HostConfig, info.NetworkingConfig, info.Platform, containerName)
 	if err != nil {
-		return id, containerName, errors.Wrapf(err, "service.runContainer failed, name: %s", containerName)
+		return id, containerName, errors.Wrapf(err, "docker.ContainerCreate failed, name: %s", containerName)
 	}
 	id = resp.ID
 
@@ -135,7 +135,7 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 		_ = docker.Cli.ContainerRemove(ctx,
 			resp.ID,
 			types.ContainerRemoveOptions{Force: true})
-		return id, containerName, errors.Wrapf(err, "service.runContainer failed, id: %s, name: %s", id, containerName)
+		return id, containerName, errors.Wrapf(err, "docker.ContainerStart failed, id: %s, name: %s", id, containerName)
 	}
 
 	// 经过 docker create 校验后的容器配置，放入到 etcd 中
@@ -162,7 +162,7 @@ func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDe
 	var err error
 	ctx := context.Background()
 	if err = docker.Cli.ContainerRemove(ctx, name, types.ContainerRemoveOptions{Force: spec.Force}); err != nil {
-		return errors.Wrapf(err, "serivce.DeleteContainer failed, name: %s", name)
+		return errors.Wrapf(err, "docker.ContainerRemove failed, name: %s", name)
 	}
 
 	if spec.DelEtcdInfo {
@@ -195,13 +195,13 @@ func (cs *ContainerService) ExecuteContainer(name string, exec *model.ContainerE
 		Cmd:          cmd,
 	})
 	if err != nil {
-		return resp, errors.Wrapf(err, "service.ExecuteContainer failed, name: %s, spec: %+v", name, exec)
+		return resp, errors.Wrapf(err, "docker.ContainerExecCreate failed, name: %s, spec: %+v", name, exec)
 	}
 
 	hijackedResp, err := docker.Cli.ContainerExecAttach(ctx, execCreate.ID, types.ExecStartCheck{})
 	defer hijackedResp.Close()
 	if err != nil {
-		return resp, errors.Wrapf(err, "service.ExecuteContainer failed, name: %s, spec: %+v", name, exec)
+		return resp, errors.Wrapf(err, "docker.ContainerExecAttach failed, name: %s, spec: %+v", name, exec)
 	}
 
 	var buf bytes.Buffer
@@ -216,12 +216,12 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 	ctx := context.Background()
 	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
 	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.PatchContainerGpuInfo failed")
+		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
 	}
 
 	var info model.EtcdContainerInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.PatchContainerGpuInfo failed")
+		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
 	// todo
@@ -236,7 +236,7 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 	info.HostConfig.Resources.DeviceRequests[0].DeviceIDs = gpuIDs
 	id, newContainerName, err = cs.runContainer(ctx, strings.Split(name, "-")[0], info)
 	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.PatchContainerGpuInfo failed")
+		return id, newContainerName, errors.WithMessage(err, "service.runContainer failed")
 	}
 
 	// 异步拷贝旧容器的系统盘到新的容器
@@ -253,12 +253,12 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 	ctx := context.Background()
 	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
 	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.PatchContainerVolumeInfo failed")
+		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
 	}
 
 	var info model.EtcdContainerInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.PatchContainerVolumeInfo failed")
+		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
 	for i := range info.HostConfig.Mounts {
@@ -269,7 +269,7 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 	}
 	id, newContainerName, err = cs.runContainer(ctx, strings.Split(name, "-")[0], info)
 	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.PatchContainerVolumeInfo failed")
+		return id, newContainerName, errors.WithMessage(err, "service.runContainer failed")
 	}
 
 	// 异步拷贝旧容器的系统盘到新的容器
@@ -282,11 +282,27 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 	return id, newContainerName, err
 }
 
+func (cs *ContainerService) StopContainer(name string) error {
+	ctx := context.Background()
+	if err := docker.Cli.ContainerStop(ctx, name, container.StopOptions{}); err != nil {
+		return errors.WithMessage(err, "docker.ContainerStop failed")
+	}
+	return nil
+}
+
+func (cs *ContainerService) RestartContainer(name string) error {
+	ctx := context.Background()
+	if err := docker.Cli.ContainerRestart(ctx, name, container.StopOptions{}); err != nil {
+		return errors.WithMessage(err, "docker.ContainerRestart failed")
+	}
+	return nil
+}
+
 func (cs *ContainerService) containerGraphDriverDataMergedDir(name string) (string, error) {
 	ctx := context.Background()
 	resp, err := docker.Cli.ContainerInspect(ctx, name)
 	if err != nil || len(resp.GraphDriver.Data["MergedDir"]) == 0 {
-		return "", errors.Wrapf(err, "service.containerGraphDriverDataDiff failed, name: %s", name)
+		return "", errors.Wrapf(err, "docker.ContainerInspect failed, name: %s", name)
 	}
 	return resp.GraphDriver.Data["MergedDir"], nil
 }
@@ -294,15 +310,15 @@ func (cs *ContainerService) containerGraphDriverDataMergedDir(name string) (stri
 func (cs *ContainerService) copyMergedDirToContainer(task *copyTask) error {
 	oldMerged, err := cs.containerGraphDriverDataMergedDir(task.OldResource)
 	if err != nil {
-		return errors.WithMessage(err, "service.copyDiffToContainer failed")
+		return errors.WithMessage(err, "service.containerGraphDriverDataMergedDir failed")
 	}
 	newMerged, err := cs.containerGraphDriverDataMergedDir(task.NewResource)
 	if err != nil {
-		return errors.WithMessage(err, "service.copyDiffToContainer failed")
+		return errors.WithMessage(err, "service.containerGraphDriverDataMergedDir failed")
 	}
 
 	if err = cs.copyMergedDirFromOldVersion(oldMerged, newMerged); err != nil {
-		return errors.WithMessage(err, "service.copyDiffToContainer failed")
+		return errors.WithMessage(err, "service.containerGraphDriverDataMergedDir failed")
 	}
 
 	return nil
@@ -312,7 +328,7 @@ func (cs *ContainerService) copyMergedDirFromOldVersion(src, dest string) error 
 	startT := time.Now()
 	command := fmt.Sprintf(cpRFPOption, src, dest)
 	if err := cmd.NewCommand(command).Execute(); err != nil {
-		return errors.Wrapf(err, "service.copyDiffFromOldVersion failed, src:%s, dest: %s", src, dest)
+		return errors.Wrapf(err, "cmd.Execute failed, command %s, src:%s, dest: %s", command, src, dest)
 	}
 	log.Infof("service.copyDiffFromOldVersion copy merged successfully, src: %s, dest: %s, time cost: %v", src, dest, time.Since(startT))
 	return nil

@@ -21,6 +21,8 @@ const (
 	CodeContainerPatchGpuInfoFailed
 	CodeContainerExisted
 	CodeContainerPatchVolumeInfoFailed
+	CodeContainerStopFailed
+	CodeContainerRestartFailed
 
 	CodeVolumeCreateFailed
 	CodeVolumeNameNotNull
@@ -50,6 +52,8 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerPatchGpuInfoFailed:         "更新容器 GPU 配置失败",
 	CodeContainerExisted:                    "容器已存在",
 	CodeContainerPatchVolumeInfoFailed:      "更新容器挂载卷配置失败",
+	CodeContainerStopFailed:                 "容器停止失败",
+	CodeContainerRestartFailed:              "容器重启动失败",
 
 	CodeVolumeCreateFailed:           "卷创建失败",
 	CodeVolumeNameNotNull:            "卷名不能为空",

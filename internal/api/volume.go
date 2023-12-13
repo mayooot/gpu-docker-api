@@ -38,7 +38,8 @@ func (vh *VolumeHandler) create(c *gin.Context) {
 
 	resp, err := vs.CreateVolume(&spec)
 	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("service.CreateVolume failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
 		if errors.Is(err, service.ErrorVolumeExisted) {
 			ResponseError(c, CodeVolumeExisted)
 			return
@@ -73,7 +74,8 @@ func (vh *VolumeHandler) delete(c *gin.Context) {
 	}
 
 	if err := vs.DeleteVolume(name, &spec); err != nil {
-		log.Error(err.Error())
+		log.Errorf("service.DeleteVolume failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
 		ResponseError(c, CodeVolumeDeleteFailed)
 		return
 	}
@@ -104,7 +106,8 @@ func (vh *VolumeHandler) patchSize(c *gin.Context) {
 
 	resp, err := vs.PatchVolumeSize(name, &spec)
 	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("service.PatchVolumeSize failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)
 		return
 	}

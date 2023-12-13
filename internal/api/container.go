@@ -21,6 +21,8 @@ func (ch *ContainerHandler) RegisterRoute(g *gin.RouterGroup) {
 	g.POST("/containers/:name/execute", ch.execute)
 	g.PATCH("/containers/:name/gpu", ch.patchGpuInfo)
 	g.PATCH("/containers/:name/volume", ch.pathVolumeInfo)
+	g.PATCH("/containers/:name/stop", ch.stop)
+	g.PATCH("/containers/:name/restart", ch.restart)
 }
 
 func (ch *ContainerHandler) run(c *gin.Context) {
@@ -51,7 +53,8 @@ func (ch *ContainerHandler) run(c *gin.Context) {
 
 	id, containerName, err := cs.RunGpuContainer(&spec)
 	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("service.RunGpuContainer failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
 		if errors.Is(err, service.ErrorContainerExisted) {
 			ResponseError(c, CodeContainerExisted)
 			return
@@ -87,7 +90,8 @@ func (ch *ContainerHandler) delete(c *gin.Context) {
 	}
 
 	if err := cs.DeleteContainer(name, &spec); err != nil {
-		log.Error(err.Error())
+		log.Errorf("service.DeleteContainer failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
 		ResponseError(c, CodeContainerDeleteFailed)
 		return
 	}
@@ -117,7 +121,8 @@ func (ch *ContainerHandler) execute(c *gin.Context) {
 
 	resp, err := cs.ExecuteContainer(name, &spec)
 	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("service.ExecuteContainer failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
 		ResponseError(c, CodeContainerExecuteFailed)
 		return
 	}
@@ -147,7 +152,8 @@ func (ch *ContainerHandler) patchGpuInfo(c *gin.Context) {
 
 	id, containerName, err := cs.PatchContainerGpuInfo(name, &spec)
 	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("service.PatchContainerGpuInfo failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)
 		return
 	}
@@ -180,7 +186,8 @@ func (ch *ContainerHandler) pathVolumeInfo(c *gin.Context) {
 
 	id, containerName, err := cs.PatchContainerVolumeInfo(name, &spec)
 	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("service.PatchContainerVolumeInfo failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)
 		return
 	}
@@ -189,4 +196,50 @@ func (ch *ContainerHandler) pathVolumeInfo(c *gin.Context) {
 		"id":   id,
 		"name": containerName,
 	})
+}
+
+func (ch *ContainerHandler) stop(c *gin.Context) {
+	name := c.Param("name")
+	if len(name) == 0 {
+		log.Error("failed to stop container, name is empty")
+		ResponseError(c, CodeContainerNameNotNull)
+		return
+	}
+
+	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
+		log.Errorf("failed to stop container, name: %s must be in format: name-version", name)
+		ResponseError(c, CodeContainerNameMustContainVersion)
+	}
+
+	if err := cs.StopContainer(name); err != nil {
+		log.Errorf("service.StopContainer failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
+		ResponseError(c, CodeContainerStopFailed)
+		return
+	}
+
+	ResponseSuccess(c, nil)
+}
+
+func (ch *ContainerHandler) restart(c *gin.Context) {
+	name := c.Param("name")
+	if len(name) == 0 {
+		log.Error("failed to restart container, name is empty")
+		ResponseError(c, CodeContainerNameNotNull)
+		return
+	}
+
+	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
+		log.Errorf("failed to restart container, name: %s must be in format: name-version", name)
+		ResponseError(c, CodeContainerNameMustContainVersion)
+	}
+
+	if err := cs.RestartContainer(name); err != nil {
+		log.Errorf("service.RestartContainer failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
+		ResponseError(c, CodeContainerRestartFailed)
+		return
+	}
+
+	ResponseSuccess(c, nil)
 }

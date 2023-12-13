@@ -29,7 +29,7 @@ type VolumeService struct{}
 func (vs *VolumeService) CreateVolume(spec *model.VolumeCreate) (resp volume.Volume, err error) {
 	ctx := context.Background()
 	if vs.existVolume(spec.Name) {
-		return resp, errors.Wrapf(ErrorVolumeExisted, "serivce.CreateVolume failed, volume %s", spec.Name)
+		return resp, errors.Wrapf(ErrorVolumeExisted, "volume %s", spec.Name)
 	}
 
 	var opt volume.CreateOptions
@@ -45,7 +45,7 @@ func (vs *VolumeService) CreateVolume(spec *model.VolumeCreate) (resp volume.Vol
 		Opt: &opt,
 	})
 	if err != nil {
-		return resp, errors.WithMessage(err, "service.CreateVolume failed")
+		return resp, errors.WithMessage(err, "service.createVolume failed")
 	}
 
 	log.Infof("volume created successfully, name: %s, spec: %+v", resp.Name, spec)
@@ -63,7 +63,7 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 	info.Opt.Name = fmt.Sprintf("%s-%d", info.Opt.Name, version)
 	resp, err = docker.Cli.VolumeCreate(ctx, *info.Opt)
 	if err != nil {
-		return resp, errors.Wrapf(err, "service.createVolume failed, opt: %+v", info)
+		return resp, errors.Wrapf(err, "docker.VolumeCreate failed, opt: %+v", info)
 	}
 
 	val := &model.EtcdVolumeInfo{
@@ -82,7 +82,7 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 func (vs *VolumeService) DeleteVolume(name string, spec *model.VolumeDelete) error {
 	ctx := context.Background()
 	if err := docker.Cli.VolumeRemove(ctx, name, spec.Force); err != nil {
-		return errors.Wrapf(err, "service.DeleteVolume failed, name: %s", name)
+		return errors.Wrapf(err, "docker.VolumeRemove failed, name: %s", name)
 	}
 
 	if spec.DelEtcdInfo {
@@ -99,12 +99,12 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 	ctx := context.Background()
 	infoBytes, err := etcd.Get(etcd.VolumePrefix, name)
 	if err != nil {
-		return resp, errors.WithMessage(err, "service.PatchVolumeSize failed")
+		return resp, errors.WithMessage(err, "etcd.Get failed")
 	}
 
 	var info model.EtcdVolumeInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
-		return resp, errors.WithMessage(err, "service.PatchVolumeSize failed")
+		return resp, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
 	// 更改 volume 的 size
@@ -112,7 +112,7 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 	info.Opt.Name = strings.Split(name, "-")[0]
 	resp, err = vs.createVolume(ctx, info)
 	if err != nil {
-		return resp, errors.WithMessage(err, "service.PatchVolumeSize failed")
+		return resp, errors.WithMessage(err, "service.createVolume failed")
 	}
 
 	// 将旧的Volume 里的数据移到新的 Volume 中
@@ -129,7 +129,7 @@ func (vs *VolumeService) volumeMountpoint(name string) (string, error) {
 	ctx := context.Background()
 	resp, err := docker.Cli.VolumeInspect(ctx, name)
 	if err != nil || len(resp.Mountpoint) == 0 {
-		return "", errors.Wrapf(err, "service.volumeMountpoint failed, name: %s", name)
+		return "", errors.Wrapf(err, "docker.VolumeInspect failed, name: %s", name)
 	}
 
 	return resp.Mountpoint, nil
@@ -138,15 +138,15 @@ func (vs *VolumeService) volumeMountpoint(name string) (string, error) {
 func (vs *VolumeService) copyMountpointToContainer(task *copyTask) error {
 	oldMountpoint, err := vs.volumeMountpoint(task.OldResource)
 	if err != nil {
-		return errors.WithMessage(err, "service.copyMountpointToContainer failed")
+		return errors.WithMessage(err, "service.volumeMountpoint failed")
 	}
 	newMountpoint, err := vs.volumeMountpoint(task.NewResource)
 	if err != nil {
-		return errors.WithMessage(err, "service.copyMountpointToContainer failed")
+		return errors.WithMessage(err, "service.volumeMountpoint failed")
 	}
 
 	if err = vs.copyMountpointFromOldVersion(oldMountpoint, newMountpoint); err != nil {
-		return errors.WithMessage(err, "service.copyMountpointToContainer failed")
+		return errors.WithMessage(err, "service.copyMountpointFromOldVersion failed")
 	}
 
 	return nil
@@ -156,7 +156,7 @@ func (vs *VolumeService) copyMountpointFromOldVersion(src, dest string) error {
 	startT := time.Now()
 	command := fmt.Sprintf(cpRFPOption, src, dest)
 	if err := cmd.NewCommand(command).Execute(); err != nil {
-		return errors.Wrapf(err, "service.copyMountpointFromOldVersion failed, src:%s, dest: %s", src, dest)
+		return errors.Wrapf(err, "cmd.Execute failed, command: %s, src:%s, dest: %s", command, src, dest)
 	}
 	log.Infof("service.copyMountpointFromOldVersion copy mountpoint successfully, src: %s, dest: %s, time cost: %v", src, dest, time.Since(startT))
 	return nil
