@@ -44,7 +44,7 @@ func (ch *ContainerHandler) run(c *gin.Context) {
 	}
 
 	if strings.Contains(spec.ContainerName, "-") {
-		log.Error("failed to create container, container name container '-'")
+		log.Error("failed to create container, container name: %s must container '-'", spec.ContainerName)
 		ResponseError(c, CodeContainerNameNotContainsSpecialChar)
 		return
 	}
@@ -75,12 +75,18 @@ func (ch *ContainerHandler) delete(c *gin.Context) {
 	}
 
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
-		log.Error("failed to patch container gpu info, name must be in format: name-version")
+		log.Errorf("failed to delete container, name must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
 	}
 
-	err := cs.DeleteContainer(&name)
-	if err != nil {
+	var spec model.ContainerDelete
+	if err := c.ShouldBindJSON(&spec); err != nil {
+		log.Error("failed to delete container, error:", err.Error())
+		ResponseError(c, CodeInvalidParams)
+		return
+	}
+
+	if err := cs.DeleteContainer(name, &spec); err != nil {
 		log.Error(err.Error())
 		ResponseError(c, CodeContainerDeleteFailed)
 		return
@@ -98,7 +104,7 @@ func (ch *ContainerHandler) execute(c *gin.Context) {
 	}
 
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
-		log.Error("failed to patch container gpu info, name must be in format: name-version")
+		log.Errorf("failed to execute container, name: %s must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
 	}
 
@@ -109,7 +115,7 @@ func (ch *ContainerHandler) execute(c *gin.Context) {
 		return
 	}
 
-	resp, err := cs.ExecuteContainer(&name, &spec)
+	resp, err := cs.ExecuteContainer(name, &spec)
 	if err != nil {
 		log.Error(err.Error())
 		ResponseError(c, CodeContainerExecuteFailed)
@@ -128,7 +134,7 @@ func (ch *ContainerHandler) patchGpuInfo(c *gin.Context) {
 	}
 
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
-		log.Error("failed to patch container gpu info, name must be in format: name-version")
+		log.Errorf("failed to patch container gpu info, name: %s must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
 	}
 
@@ -161,7 +167,7 @@ func (ch *ContainerHandler) pathVolumeInfo(c *gin.Context) {
 	}
 
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
-		log.Error("failed to patch container volume info, name must be in format: name-version")
+		log.Errorf("failed to patch container volume info, name: %s must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
 	}
 

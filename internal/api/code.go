@@ -27,6 +27,8 @@ const (
 	CodeVolumeDeleteFailed
 	CodeVolumeExisted
 	CodeVolumeNameMustContainVersion
+
+	CodeEtcdDeleteFailed
 )
 
 var codeMsgMap = map[ResCode]string{
@@ -54,6 +56,8 @@ var codeMsgMap = map[ResCode]string{
 	CodeVolumeDeleteFailed:           "卷删除失败",
 	CodeVolumeExisted:                "卷已存在",
 	CodeVolumeNameMustContainVersion: "卷名必须包含版本号",
+
+	CodeEtcdDeleteFailed: "删除 etcd 中的资源失败",
 }
 
 func (c ResCode) Msg() string {

@@ -149,7 +149,7 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 	}
 	// 异步添加到 etcd 中
 	WorkQueue <- etcd.PutKeyValue{
-		Key:      &containerName,
+		Key:      containerName,
 		Value:    val.Serialize(),
 		Resource: etcd.ContainerPrefix,
 	}
@@ -158,18 +158,24 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 	return id, containerName, err
 }
 
-func (cs *ContainerService) DeleteContainer(name *string) error {
+func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDelete) error {
+	var err error
 	ctx := context.Background()
-	err := docker.Cli.ContainerRemove(ctx, *name, types.ContainerRemoveOptions{Force: true})
-	if err != nil {
-		return errors.Wrapf(err, "serivce.DeleteContainer failed, name: %s", *name)
+	if err = docker.Cli.ContainerRemove(ctx, name, types.ContainerRemoveOptions{Force: spec.Force}); err != nil {
+		return errors.Wrapf(err, "serivce.DeleteContainer failed, name: %s", name)
 	}
 
-	log.Info("container deleted successfully, name:", *name)
+	if spec.DelEtcdInfo {
+		WorkQueue <- etcd.DelKey{
+			Resource: etcd.ContainerPrefix,
+			Key:      name,
+		}
+	}
+	log.Info("container deleted successfully, name:", name)
 	return err
 }
 
-func (cs *ContainerService) ExecuteContainer(name *string, exec *model.ContainerExecute) (resp *string, err error) {
+func (cs *ContainerService) ExecuteContainer(name string, exec *model.ContainerExecute) (resp *string, err error) {
 	workDir := "/"
 	var cmd []string
 	if len(exec.WorkDir) != 0 {
@@ -180,7 +186,7 @@ func (cs *ContainerService) ExecuteContainer(name *string, exec *model.Container
 	}
 
 	ctx := context.Background()
-	execCreate, err := docker.Cli.ContainerExecCreate(ctx, *name, types.ExecConfig{
+	execCreate, err := docker.Cli.ContainerExecCreate(ctx, name, types.ExecConfig{
 		AttachStderr: true,
 		AttachStdout: true,
 		Detach:       true,
@@ -189,13 +195,13 @@ func (cs *ContainerService) ExecuteContainer(name *string, exec *model.Container
 		Cmd:          cmd,
 	})
 	if err != nil {
-		return resp, errors.Wrapf(err, "service.ExecuteContainer failed, name: %s, spec: %+v", *name, exec)
+		return resp, errors.Wrapf(err, "service.ExecuteContainer failed, name: %s, spec: %+v", name, exec)
 	}
 
 	hijackedResp, err := docker.Cli.ContainerExecAttach(ctx, execCreate.ID, types.ExecStartCheck{})
 	defer hijackedResp.Close()
 	if err != nil {
-		return resp, errors.Wrapf(err, "service.ExecuteContainer failed, name: %s, spec: %+v", *name, exec)
+		return resp, errors.Wrapf(err, "service.ExecuteContainer failed, name: %s, spec: %+v", name, exec)
 	}
 
 	var buf bytes.Buffer
@@ -208,7 +214,7 @@ func (cs *ContainerService) ExecuteContainer(name *string, exec *model.Container
 
 func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.ContainerGpuPatch) (id, newContainerName string, err error) {
 	ctx := context.Background()
-	infoBytes, err := etcd.GetContainerInfo(ctx, name)
+	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "service.PatchContainerGpuInfo failed")
 	}
@@ -244,7 +250,7 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 }
 func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.ContainerVolumePatch) (id, newContainerName string, err error) {
 	ctx := context.Background()
-	infoBytes, err := etcd.GetContainerInfo(ctx, name)
+	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "service.PatchContainerVolumeInfo failed")
 	}

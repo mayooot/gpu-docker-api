@@ -70,7 +70,7 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 		Version: version.Get(),
 	}
 	WorkQueue <- etcd.PutKeyValue{
-		Key:      &info.Opt.Name,
+		Key:      info.Opt.Name,
 		Value:    val.Serialize(),
 		Resource: etcd.VolumePrefix,
 	}
@@ -78,20 +78,25 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 	return resp, err
 }
 
-func (vs *VolumeService) DeleteVolume(name *string) error {
+func (vs *VolumeService) DeleteVolume(name string, spec *model.VolumeDelete) error {
 	ctx := context.Background()
-	err := docker.Cli.VolumeRemove(ctx, *name, true)
-	if err != nil {
-		return errors.Wrapf(err, "service.DeleteVolume failed, name: %s", *name)
+	if err := docker.Cli.VolumeRemove(ctx, name, spec.Force); err != nil {
+		return errors.Wrapf(err, "service.DeleteVolume failed, name: %s", name)
 	}
 
-	log.Infof("volume deleted successfully, name: %s", *name)
+	if spec.DelEtcdInfo {
+		WorkQueue <- etcd.DelKey{
+			Resource: etcd.VolumePrefix,
+			Key:      name,
+		}
+	}
+	log.Infof("volume deleted successfully, name: %s", name)
 	return nil
 }
 
 func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (resp volume.Volume, err error) {
 	ctx := context.Background()
-	infoBytes, err := etcd.GetVolumeInfo(ctx, name)
+	infoBytes, err := etcd.Get(etcd.VolumePrefix, name)
 	if err != nil {
 		return resp, errors.WithMessage(err, "service.PatchVolumeSize failed")
 	}

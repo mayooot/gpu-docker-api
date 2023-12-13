@@ -13,3 +13,8 @@ type VolumeCreate struct {
 type VolumeSize struct {
 	Size string `json:"size"`
 }
+
+type VolumeDelete struct {
+	Force       bool `json:"force"`
+	DelEtcdInfo bool `json:"delEtcdInfo"`
+}

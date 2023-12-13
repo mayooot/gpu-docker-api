@@ -29,32 +29,27 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 		case v := <-WorkQueue:
 			switch v := v.(type) {
 			case etcd.PutKeyValue:
-				switch v.Resource {
-				case etcd.ContainerPrefix:
-					go func() {
-						wg.Add(1)
-						defer wg.Done()
-						if err := etcd.PutContainerInfo(ctx, v.Key, v.Value); err != nil {
-							log.Error(err.Error())
-							WorkQueue <- v
-							return
-						}
-						log.Infof("put to etcd successfully, key: %s, value: %s", *v.Key, *v.Value)
-					}()
-				case etcd.VolumePrefix:
-					go func() {
-						wg.Add(1)
-						defer wg.Done()
-						if err := etcd.PutVolumeInfo(ctx, v.Key, v.Value); err != nil {
-							log.Error(err.Error())
-							WorkQueue <- v
-							return
-						}
-						log.Infof("put to etcd successfully, key: %s, value: %s", *v.Key, *v.Value)
-					}()
-				default:
-					// do nothing
-				}
+				go func() {
+					wg.Add(1)
+					defer wg.Done()
+					if err := etcd.Put(v.Resource, v.Key, v.Value); err != nil {
+						log.Error(err.Error())
+						WorkQueue <- v
+						return
+					}
+					log.Infof("put to etcd successfully, resource %s, key: %s, value: %s", v.Resource, v.Key, *v.Value)
+				}()
+			case etcd.DelKey:
+				go func() {
+					wg.Add(1)
+					defer wg.Done()
+					if err := etcd.Del(v.Resource, v.Key); err != nil {
+						log.Error(err.Error())
+						WorkQueue <- v
+						return
+					}
+					log.Infof("delete etcd key successfully, resource %s, key: %s", v.Resource, v.Key)
+				}()
 			case *copyTask:
 				switch v.Resource {
 				case etcd.ContainerPrefix:

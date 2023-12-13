@@ -30,7 +30,7 @@ func (vh *VolumeHandler) create(c *gin.Context) {
 	}
 
 	if strings.Contains(spec.Name, "-") {
-		log.Error("failed to create volume, volume name contain '-'")
+		log.Errorf("failed to create volume, volume name: %s must contain '-'", spec.Name)
 		ResponseError(c, CodeContainerNameNotContainsSpecialChar)
 		return
 	}
@@ -59,9 +59,19 @@ func (vh *VolumeHandler) delete(c *gin.Context) {
 		ResponseError(c, CodeVolumeNameNotNull)
 		return
 	}
+	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
+		log.Errorf("failed to delete volume, name: %s must be in format: name-version", name)
+		ResponseError(c, CodeVolumeNameMustContainVersion)
+	}
 
-	err := vs.DeleteVolume(&name)
-	if err != nil {
+	var spec model.VolumeDelete
+	if err := c.ShouldBindJSON(&spec); err != nil {
+		log.Error("failed to delete volume, error:", err.Error())
+		ResponseError(c, CodeInvalidParams)
+		return
+	}
+
+	if err := vs.DeleteVolume(name, &spec); err != nil {
 		log.Error(err.Error())
 		ResponseError(c, CodeVolumeDeleteFailed)
 		return
@@ -79,14 +89,14 @@ func (vh *VolumeHandler) patchSize(c *gin.Context) {
 	}
 
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
-		log.Error("failed to patch container gpu info, name must be in format: name-version")
+		log.Errorf("failed to patch volume size, name: %s must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
 		return
 	}
 
 	var spec model.VolumeSize
 	if err := c.ShouldBindJSON(&spec); err != nil {
-		log.Error("failed to patch container gpu info, error:", err.Error())
+		log.Error("failed to patch volume size, error:", err.Error())
 		ResponseError(c, CodeInvalidParams)
 		return
 	}

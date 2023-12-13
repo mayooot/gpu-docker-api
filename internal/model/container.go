@@ -15,6 +15,7 @@ type ContainerRun struct {
 	Cmd           []string `json:"cmd,omitempty"`
 	Ports         []Ports  `json:"ports,omitempty"`
 }
+
 type Ports struct {
 	HostPort      uint16 `json:"hostPort"`
 	ContainerPort uint16 `json:"containerPort"`
@@ -33,4 +34,9 @@ type ContainerVolumePatch struct {
 	Type          mount.Type `json:"type"`
 	OldVolumeName string     `json:"oldVolumeName"`
 	NewVolumeName string     `json:"newVolumeName"`
+}
+
+type ContainerDelete struct {
+	Force       bool `json:"force"`
+	DelEtcdInfo bool `json:"delEtcdInfo"`
 }
