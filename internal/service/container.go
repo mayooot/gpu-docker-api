@@ -43,7 +43,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 
 	ctx := context.Background()
 	if cs.existContainer(spec.ContainerName) {
-		return id, containerName, errors.Wrapf(ErrorContainerExisted, "container: %s", spec.ContainerName)
+		return id, containerName, errors.Wrapf(ErrorContainerExisted, "service.RunGpuContainer failed, container %s", spec.ContainerName)
 	}
 
 	config = container.Config{
@@ -126,7 +126,7 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 	containerName = fmt.Sprintf("%s-%d", name, version)
 	resp, err := docker.Cli.ContainerCreate(ctx, info.Config, info.HostConfig, info.NetworkingConfig, info.Platform, containerName)
 	if err != nil {
-		return id, containerName, errors.Wrapf(err, "service.runContainer, name: %s", containerName)
+		return id, containerName, errors.Wrapf(err, "service.runContainer failed, name: %s", containerName)
 	}
 	id = resp.ID
 
@@ -135,7 +135,7 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 		_ = docker.Cli.ContainerRemove(ctx,
 			resp.ID,
 			types.ContainerRemoveOptions{Force: true})
-		return id, containerName, errors.Wrapf(err, "service.runContainer, id: %s, name: %s", id, containerName)
+		return id, containerName, errors.Wrapf(err, "service.runContainer failed, id: %s, name: %s", id, containerName)
 	}
 
 	// 经过 docker create 校验后的容器配置，放入到 etcd 中
@@ -162,7 +162,7 @@ func (cs *ContainerService) DeleteContainer(name *string) error {
 	ctx := context.Background()
 	err := docker.Cli.ContainerRemove(ctx, *name, types.ContainerRemoveOptions{Force: true})
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete container, name: %s", *name)
+		return errors.Wrapf(err, "serivce.DeleteContainer failed, name: %s", *name)
 	}
 
 	log.Info("container deleted successfully, name:", *name)
@@ -189,13 +189,13 @@ func (cs *ContainerService) ExecuteContainer(name *string, exec *model.Container
 		Cmd:          cmd,
 	})
 	if err != nil {
-		return resp, errors.Wrapf(err, "failed to create container exec, name: %s, spec: %+v", *name, exec)
+		return resp, errors.Wrapf(err, "service.ExecuteContainer failed, name: %s, spec: %+v", *name, exec)
 	}
 
 	hijackedResp, err := docker.Cli.ContainerExecAttach(ctx, execCreate.ID, types.ExecStartCheck{})
 	defer hijackedResp.Close()
 	if err != nil {
-		return resp, errors.Wrapf(err, "failed to attach container exec, name: %s, spec: %+v", *name, exec)
+		return resp, errors.Wrapf(err, "service.ExecuteContainer failed, name: %s, spec: %+v", *name, exec)
 	}
 
 	var buf bytes.Buffer
@@ -279,7 +279,7 @@ func (cs *ContainerService) containerGraphDriverDataMergedDir(name string) (stri
 	ctx := context.Background()
 	resp, err := docker.Cli.ContainerInspect(ctx, name)
 	if err != nil || len(resp.GraphDriver.Data["MergedDir"]) == 0 {
-		return "", errors.Wrapf(err, "service.containerGraphDriverDataDiff, name: %s", name)
+		return "", errors.Wrapf(err, "service.containerGraphDriverDataDiff failed, name: %s", name)
 	}
 	return resp.GraphDriver.Data["MergedDir"], nil
 }
@@ -287,15 +287,15 @@ func (cs *ContainerService) containerGraphDriverDataMergedDir(name string) (stri
 func (cs *ContainerService) copyMergedDirToContainer(task *copyTask) error {
 	oldMerged, err := cs.containerGraphDriverDataMergedDir(task.OldResource)
 	if err != nil {
-		return errors.WithMessage(err, "service.copyDiffToContainer")
+		return errors.WithMessage(err, "service.copyDiffToContainer failed")
 	}
 	newMerged, err := cs.containerGraphDriverDataMergedDir(task.NewResource)
 	if err != nil {
-		return errors.WithMessage(err, "service.copyDiffToContainer")
+		return errors.WithMessage(err, "service.copyDiffToContainer failed")
 	}
 
 	if err = cs.copyMergedDirFromOldVersion(oldMerged, newMerged); err != nil {
-		return errors.WithMessage(err, "service.copyDiffToContainer")
+		return errors.WithMessage(err, "service.copyDiffToContainer failed")
 	}
 
 	return nil
@@ -305,7 +305,7 @@ func (cs *ContainerService) copyMergedDirFromOldVersion(src, dest string) error 
 	startT := time.Now()
 	command := fmt.Sprintf(cpRFPOption, src, dest)
 	if err := cmd.NewCommand(command).Execute(); err != nil {
-		return errors.Wrapf(err, "service.copyDiffFromOldVersion, src:%s, dest: %s", src, dest)
+		return errors.Wrapf(err, "service.copyDiffFromOldVersion failed, src:%s, dest: %s", src, dest)
 	}
 	log.Infof("service.copyDiffFromOldVersion copy merged successfully, src: %s, dest: %s, time cost: %v", src, dest, time.Since(startT))
 	return nil
