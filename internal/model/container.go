@@ -1,6 +1,8 @@
 package model
 
-import "github.com/docker/docker/api/types/mount"
+import (
+	"github.com/docker/docker/api/types/mount"
+)
 
 type ContainerRun struct {
 	ImageName     string   `json:"imageName"`
@@ -9,6 +11,13 @@ type ContainerRun struct {
 	GpuNumbers    []string `json:"gpuNumbers,omitempty"`
 	Cardless      bool     `json:"cardless,omitempty"`
 	Binds         []Bind   `json:"binds,omitempty"`
+	Env           []string `json:"env,omitempty"`
+	Cmd           []string `json:"cmd,omitempty"`
+	Ports         []Ports  `json:"ports,omitempty"`
+}
+type Ports struct {
+	HostPort      uint16 `json:"hostPort"`
+	ContainerPort uint16 `json:"containerPort"`
 }
 
 type ContainerExecute struct {
@@ -16,13 +25,10 @@ type ContainerExecute struct {
 	Cmd     []string `json:"cmd,omitempty"`
 }
 
-type ContainerRename struct {
-	NewName string `json:"newName"`
-}
-
 type ContainerGpuPatch struct {
 	GpuCount int `json:"gpuCount"`
 }
+
 type ContainerVolumePatch struct {
 	Type          mount.Type `json:"type"`
 	OldVolumeName string     `json:"oldVolumeName"`

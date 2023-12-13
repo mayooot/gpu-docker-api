@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/docker/docker/api/types/filters"
+	"github.com/docker/go-connections/nat"
 	"strings"
 	"time"
 
@@ -47,8 +48,17 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 
 	config = container.Config{
 		Image:     spec.ImageName,
+		Cmd:       spec.Cmd,
+		Env:       spec.Env,
 		OpenStdin: true,
 		Tty:       true,
+	}
+
+	hostConfig.PortBindings = make(nat.PortMap, len(spec.Ports))
+	for _, port := range spec.Ports {
+		hostConfig.PortBindings[nat.Port(fmt.Sprintf("%d/tcp", port.ContainerPort))] = []nat.PortBinding{{
+			HostPort: fmt.Sprintf("%d", port.HostPort),
+		}}
 	}
 
 	if !spec.Cardless {
