@@ -5,30 +5,30 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/docker/go-connections/nat"
 	"strings"
 	"time"
-
-	"github.com/mayooot/gpu-docker-api/internal/docker"
-	"github.com/mayooot/gpu-docker-api/internal/etcd"
-	"github.com/mayooot/gpu-docker-api/internal/model"
 
 	"github.com/commander-cli/cmd"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/pkg/stdcopy"
+	"github.com/docker/go-connections/nat"
 	"github.com/ngaut/log"
+	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/pkg/errors"
 	"github.com/siddontang/go/sync2"
 
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	cmap "github.com/orcaman/concurrent-map/v2"
+	"github.com/mayooot/gpu-docker-api/internal/docker"
+	"github.com/mayooot/gpu-docker-api/internal/etcd"
+	"github.com/mayooot/gpu-docker-api/internal/model"
 )
 
 var containerVersionMap = cmap.New[sync2.AtomicInt64]()
+
 var ErrorContainerExisted = errors.New("container already exist")
 
 type ContainerService struct{}
@@ -248,6 +248,7 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 
 	return id, newContainerName, err
 }
+
 func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.ContainerVolumePatch) (id, newContainerName string, err error) {
 	ctx := context.Background()
 	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)

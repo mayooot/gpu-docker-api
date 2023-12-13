@@ -6,7 +6,6 @@ import (
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/api/types/volume"
-
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 

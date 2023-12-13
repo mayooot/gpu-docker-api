@@ -4,14 +4,15 @@ import (
 	"context"
 	"sync"
 
-	"github.com/mayooot/gpu-docker-api/internal/etcd"
-
 	"github.com/ngaut/log"
+
+	"github.com/mayooot/gpu-docker-api/internal/etcd"
 )
 
 const _maxContainerCount = 110
 
 var WorkQueue chan interface{}
+
 var (
 	cs ContainerService
 	vs VolumeService

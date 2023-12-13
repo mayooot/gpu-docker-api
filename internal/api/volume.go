@@ -1,13 +1,14 @@
 package api
 
 import (
-	"github.com/mayooot/gpu-docker-api/internal/model"
-	"github.com/mayooot/gpu-docker-api/internal/service"
-	"github.com/pkg/errors"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ngaut/log"
+	"github.com/pkg/errors"
+
+	"github.com/mayooot/gpu-docker-api/internal/model"
+	"github.com/mayooot/gpu-docker-api/internal/service"
 )
 
 var vs service.VolumeService

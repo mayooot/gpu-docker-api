@@ -4,23 +4,24 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/commander-cli/cmd"
-	"github.com/docker/docker/api/types/filters"
-	"github.com/mayooot/gpu-docker-api/internal/etcd"
-	cmap "github.com/orcaman/concurrent-map/v2"
-	"github.com/siddontang/go/sync2"
 	"strings"
 	"time"
 
-	"github.com/mayooot/gpu-docker-api/internal/docker"
-	"github.com/mayooot/gpu-docker-api/internal/model"
-
+	"github.com/commander-cli/cmd"
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/ngaut/log"
+	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/pkg/errors"
+	"github.com/siddontang/go/sync2"
+
+	"github.com/mayooot/gpu-docker-api/internal/docker"
+	"github.com/mayooot/gpu-docker-api/internal/etcd"
+	"github.com/mayooot/gpu-docker-api/internal/model"
 )
 
 var volumeVersionMap = cmap.New[sync2.AtomicInt64]()
+
 var ErrorVolumeExisted = errors.New("volume already exist")
 
 type VolumeService struct{}

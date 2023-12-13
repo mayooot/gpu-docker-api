@@ -36,6 +36,6 @@ fmt:
 	gofmt -l -w .
 
 imports:
-	goimports -l -w -local github.com/${GITHUB_USER}/${BINARY} .
+	goimports-reviser --rm-unused -local github.com/${GITHUB_USER}/${BINARY} -format ./...
 
 .PHONY: linux fmt imports

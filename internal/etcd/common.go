@@ -2,9 +2,10 @@ package etcd
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"path"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (

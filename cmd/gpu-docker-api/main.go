@@ -6,14 +6,14 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/gin-gonic/gin"
+	"github.com/judwhite/go-svc"
+	"github.com/ngaut/log"
+
 	"github.com/mayooot/gpu-docker-api/internal/api"
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/service"
-
-	"github.com/gin-gonic/gin"
-	"github.com/judwhite/go-svc"
-	"github.com/ngaut/log"
 )
 
 var (
