@@ -23,6 +23,7 @@ func (ch *ContainerHandler) RegisterRoute(g *gin.RouterGroup) {
 	g.PATCH("/containers/:name/volume", ch.pathVolumeInfo)
 	g.PATCH("/containers/:name/stop", ch.stop)
 	g.PATCH("/containers/:name/restart", ch.restart)
+	g.POST("/containers/:name/commit", ch.commit)
 }
 
 func (ch *ContainerHandler) run(c *gin.Context) {
@@ -242,4 +243,31 @@ func (ch *ContainerHandler) restart(c *gin.Context) {
 	}
 
 	ResponseSuccess(c, nil)
+}
+
+func (ch *ContainerHandler) commit(c *gin.Context) {
+	name := c.Param("name")
+	if len(name) == 0 {
+		log.Error("failed to commit container, name is empty")
+		ResponseError(c, CodeContainerNameNotNull)
+		return
+	}
+
+	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
+		log.Errorf("failed to commit container, name: %s must be in format: name-version", name)
+		ResponseError(c, CodeContainerNameMustContainVersion)
+	}
+
+	id, err := cs.CommitContainer(name)
+	if err != nil {
+		log.Errorf("service.RestartContainer failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
+		ResponseError(c, CodeContainerRestartFailed)
+		return
+	}
+
+	ResponseSuccess(c, gin.H{
+		"imageID":   id,
+		"imageName": name,
+	})
 }

@@ -113,51 +113,6 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 	return id, containerName, err
 }
 
-func (cs *ContainerService) runContainer(ctx context.Context, name string, info model.EtcdContainerInfo) (id, containerName string, err error) {
-	// 容器的版本号
-	version, ok := containerVersionMap.Get(name)
-	if !ok {
-		containerVersionMap.Set(name, 0)
-	} else {
-		containerVersionMap.Set(name, sync2.AtomicInt64(version.Add(1)))
-	}
-
-	// 容器名称
-	containerName = fmt.Sprintf("%s-%d", name, version)
-	resp, err := docker.Cli.ContainerCreate(ctx, info.Config, info.HostConfig, info.NetworkingConfig, info.Platform, containerName)
-	if err != nil {
-		return id, containerName, errors.Wrapf(err, "docker.ContainerCreate failed, name: %s", containerName)
-	}
-	id = resp.ID
-
-	// 启动容器
-	if err = docker.Cli.ContainerStart(ctx, id, types.ContainerStartOptions{}); err != nil {
-		_ = docker.Cli.ContainerRemove(ctx,
-			resp.ID,
-			types.ContainerRemoveOptions{Force: true})
-		return id, containerName, errors.Wrapf(err, "docker.ContainerStart failed, id: %s, name: %s", id, containerName)
-	}
-
-	// 经过 docker create 校验后的容器配置，放入到 etcd 中
-	val := &model.EtcdContainerInfo{
-		Config:           info.Config,
-		HostConfig:       info.HostConfig,
-		NetworkingConfig: info.NetworkingConfig,
-		Platform:         info.Platform,
-		ContainerName:    containerName,
-		Version:          version.Get(),
-	}
-	// 异步添加到 etcd 中
-	WorkQueue <- etcd.PutKeyValue{
-		Key:      containerName,
-		Value:    val.Serialize(),
-		Resource: etcd.ContainerPrefix,
-	}
-
-	log.Infof("container started successfully, id: %s, name: %s", id, containerName)
-	return id, containerName, err
-}
-
 func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDelete) error {
 	var err error
 	ctx := context.Background()
@@ -298,13 +253,77 @@ func (cs *ContainerService) RestartContainer(name string) error {
 	return nil
 }
 
-func (cs *ContainerService) containerGraphDriverDataMergedDir(name string) (string, error) {
+func (cs *ContainerService) CommitContainer(name string) (string, error) {
 	ctx := context.Background()
-	resp, err := docker.Cli.ContainerInspect(ctx, name)
-	if err != nil || len(resp.GraphDriver.Data["MergedDir"]) == 0 {
-		return "", errors.Wrapf(err, "docker.ContainerInspect failed, name: %s", name)
+	resp, err := docker.Cli.ContainerCommit(ctx, name, types.ContainerCommitOptions{
+		Comment: fmt.Sprintf("container name %s, commit time: %s", name, time.Now().Format("2006-01-02 15:04:05")),
+	})
+	if err != nil {
+		return "", errors.WithMessage(err, "docker.ContainerRestart failed")
 	}
-	return resp.GraphDriver.Data["MergedDir"], nil
+
+	if err = docker.Cli.ImageTag(ctx, resp.ID, name); err != nil {
+		return "", errors.WithMessage(err, "docker.ImageTag failed")
+	}
+
+	return resp.ID, err
+}
+
+func (cs *ContainerService) runContainer(ctx context.Context, name string, info model.EtcdContainerInfo) (id, containerName string, err error) {
+	// 容器的版本号
+	version, ok := containerVersionMap.Get(name)
+	if !ok {
+		containerVersionMap.Set(name, 0)
+	} else {
+		containerVersionMap.Set(name, sync2.AtomicInt64(version.Add(1)))
+	}
+
+	// 容器名称
+	containerName = fmt.Sprintf("%s-%d", name, version)
+	resp, err := docker.Cli.ContainerCreate(ctx, info.Config, info.HostConfig, info.NetworkingConfig, info.Platform, containerName)
+	if err != nil {
+		return id, containerName, errors.Wrapf(err, "docker.ContainerCreate failed, name: %s", containerName)
+	}
+	id = resp.ID
+
+	// 启动容器
+	if err = docker.Cli.ContainerStart(ctx, id, types.ContainerStartOptions{}); err != nil {
+		_ = docker.Cli.ContainerRemove(ctx,
+			resp.ID,
+			types.ContainerRemoveOptions{Force: true})
+		return id, containerName, errors.Wrapf(err, "docker.ContainerStart failed, id: %s, name: %s", id, containerName)
+	}
+
+	// 经过 docker create 校验后的容器配置，放入到 etcd 中
+	val := &model.EtcdContainerInfo{
+		Config:           info.Config,
+		HostConfig:       info.HostConfig,
+		NetworkingConfig: info.NetworkingConfig,
+		Platform:         info.Platform,
+		ContainerName:    containerName,
+		Version:          version.Get(),
+	}
+	// 异步添加到 etcd 中
+	WorkQueue <- etcd.PutKeyValue{
+		Key:      containerName,
+		Value:    val.Serialize(),
+		Resource: etcd.ContainerPrefix,
+	}
+
+	log.Infof("container started successfully, id: %s, name: %s", id, containerName)
+	return id, containerName, err
+}
+
+func (cs *ContainerService) existContainer(name string) bool {
+	ctx := context.Background()
+	list, err := docker.Cli.ContainerList(ctx, types.ContainerListOptions{
+		Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: fmt.Sprintf("^%s-", name)}),
+	})
+	if err != nil || len(list) == 0 {
+		return false
+	}
+
+	return len(list) > 0
 }
 
 func (cs *ContainerService) copyMergedDirToContainer(task *copyTask) error {
@@ -324,6 +343,15 @@ func (cs *ContainerService) copyMergedDirToContainer(task *copyTask) error {
 	return nil
 }
 
+func (cs *ContainerService) containerGraphDriverDataMergedDir(name string) (string, error) {
+	ctx := context.Background()
+	resp, err := docker.Cli.ContainerInspect(ctx, name)
+	if err != nil || len(resp.GraphDriver.Data["MergedDir"]) == 0 {
+		return "", errors.Wrapf(err, "docker.ContainerInspect failed, name: %s", name)
+	}
+	return resp.GraphDriver.Data["MergedDir"], nil
+}
+
 func (cs *ContainerService) copyMergedDirFromOldVersion(src, dest string) error {
 	startT := time.Now()
 	command := fmt.Sprintf(cpRFPOption, src, dest)
@@ -332,16 +360,4 @@ func (cs *ContainerService) copyMergedDirFromOldVersion(src, dest string) error 
 	}
 	log.Infof("service.copyDiffFromOldVersion copy merged successfully, src: %s, dest: %s, time cost: %v", src, dest, time.Since(startT))
 	return nil
-}
-
-func (cs *ContainerService) existContainer(name string) bool {
-	ctx := context.Background()
-	list, err := docker.Cli.ContainerList(ctx, types.ContainerListOptions{
-		Filters: filters.NewArgs(filters.KeyValuePair{Key: "name", Value: fmt.Sprintf("^%s-", name)}),
-	})
-	if err != nil || len(list) == 0 {
-		return false
-	}
-
-	return len(list) > 0
 }

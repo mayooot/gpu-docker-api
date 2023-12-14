@@ -9,10 +9,6 @@ import (
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 )
 
-type Serializable interface {
-	Serialize() *string
-}
-
 type EtcdContainerInfo struct {
 	Config           *container.Config         `json:"Config"`
 	HostConfig       *container.HostConfig     `json:"HostConfig"`
