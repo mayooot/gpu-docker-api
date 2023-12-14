@@ -11,6 +11,7 @@
 ![design](docs/design.png)
 
 ### 实现的原理
+
 * 容器升降 GPU 资源的实现: [doc](./docs/container/container-gpu-scale.md)
 * Volume 扩缩容的实现: [doc](./docs/volume/volume-size-scale.md)
 
@@ -47,20 +48,22 @@ make build
 #### 容器（Container）相关
 
 1.
-    - [ ] 创建并启动一个 GPU 容器
+    - [x] 创建并启动一个 GPU 容器
 2.
-    - [ ] 无卡启动容器
+    - [x] 无卡启动容器
 3.
-    - [ ] 删除容器
+    - [x] 删除容器
 4.
-    - [ ] 停止容器
+    - [x] 停止容器
 5.
-    - [ ] 升降 GPU 容器的 GPU 数量
-6
-   - [x] 对已运行的容器的 Volume 扩容
+    - [x] 重启动容器
 6.
-    - [ ] 在运行的容器中执行命令（exec）
+    - [ ] 升降 GPU 容器的 GPU 数量
 7.
+    - [x] 对已运行的容器的 Volume 扩容
+8.
+    - [x] 在运行的容器中执行命令（exec）
+9.
     - [ ] 保存容器为镜像
 
 <hr>
