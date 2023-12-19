@@ -111,7 +111,11 @@ func (s *scheduler) ApplyGpus(num int) ([]string, error) {
 		return nil, xerrors.NewGpuNotEnoughError()
 	}
 
-	return availableGpus[:num], nil
+	needGpus := availableGpus[:num]
+	for _, v := range needGpus {
+		s.gpuStatusMap[v] = 1
+	}
+	return needGpus, nil
 }
 
 // RestoreGpus 归还一定数量的 GPU
