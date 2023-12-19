@@ -68,12 +68,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 			return id, containerName, errors.Wrapf(err, "gpuscheduler.ApplyGpus failed, spec: %+v", spec)
 		}
 
-		hostConfig.Resources = container.Resources{DeviceRequests: []container.DeviceRequest{{
-			Driver:       "nvidia",
-			DeviceIDs:    uuids,
-			Capabilities: [][]string{{"gpu"}},
-			Options:      nil,
-		}}}
+		hostConfig.Resources = cs.newContainerResource(uuids)
 	}
 
 	// 卷挂载
@@ -108,17 +103,20 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 
 func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDelete) error {
 	var err error
-	ctx := context.Background()
-	if err = docker.Cli.ContainerRemove(ctx, name, types.ContainerRemoveOptions{Force: spec.Force}); err != nil {
-		return errors.Wrapf(err, "docker.ContainerRemove failed, name: %s", name)
-	}
-
+	// 归还 gpu 资源
 	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
 	if err != nil {
 		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
 	}
 	gpuscheduler.Scheduler.RestoreGpus(uuids)
 
+	// 删除容器
+	ctx := context.Background()
+	if err = docker.Cli.ContainerRemove(ctx, name, types.ContainerRemoveOptions{Force: spec.Force}); err != nil {
+		return errors.Wrapf(err, "docker.ContainerRemove failed, name: %s", name)
+	}
+
+	// 是否需要异步删除 etcd 中关于容器的描述
 	if spec.DelEtcdInfo {
 		WorkQueue <- etcd.DelKey{
 			Resource: etcd.ContainerPrefix,
@@ -167,24 +165,66 @@ func (cs *ContainerService) ExecuteContainer(name string, exec *model.ContainerE
 }
 
 func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.ContainerGpuPatch) (id, newContainerName string, err error) {
+	// 从 etcd 中获取容器的描述
 	ctx := context.Background()
 	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
 	}
-
 	var info model.EtcdContainerInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
 		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
-	uuids, err := gpuscheduler.Scheduler.ApplyGpus(spec.GpuCount)
+	// 获取容器的 gpu 资源
+	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
 	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "gpuscheduler.Scheduler.ApplyGpus failed")
+		return id, newContainerName, errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+	}
+
+	// 当前容器使用的 gpu 资源和要 patch 的 gpu 资源相同
+	if len(uuids) == spec.GpuCount {
+		return id, newContainerName, xerrors.NewNoPatchRequiredError()
+	}
+
+	if spec.GpuCount > len(uuids) {
+		// 升级配置
+		applyGpus := spec.GpuCount - len(uuids)
+		uuids, err := gpuscheduler.Scheduler.ApplyGpus(applyGpus)
+		log.Infof("service.PatchContainerGpuInfo, container: %s apply %d gpus, uuids: %+v", name, applyGpus, uuids)
+		if err != nil {
+			return id, newContainerName, errors.WithMessage(err, "gpuscheduler.Scheduler.ApplyGpus failed")
+		}
+		if applyGpus == spec.GpuCount {
+			// 之前是无卡容器，所以实际申请的 gpu 资源和 要升级的 gpu 资源相同
+			info.HostConfig.Resources = cs.newContainerResource(uuids)
+			log.Infof("service.PatchContainerGpuInfo, container: %s change to card container, now use %d gpus, uuids: %s",
+				name, len(info.HostConfig.Resources.DeviceRequests[0].DeviceIDs), info.HostConfig.Resources.DeviceRequests[0].DeviceIDs)
+		} else {
+			// 之前不是无卡容器
+			info.HostConfig.Resources.DeviceRequests[0].DeviceIDs = append(info.HostConfig.Resources.DeviceRequests[0].DeviceIDs, uuids...)
+			log.Infof("service.PatchContainerGpuInfo, container: %s upgrad %d gpu configuration, now use %d gpus, uuids: %+v",
+				name, applyGpus, len(info.HostConfig.Resources.DeviceRequests[0].DeviceIDs), info.HostConfig.Resources.DeviceRequests[0].DeviceIDs)
+		}
+	} else {
+		// 降低配置或变为无卡容器
+		restoreGpus := len(uuids) - spec.GpuCount
+		gpuscheduler.Scheduler.RestoreGpus(uuids[:restoreGpus])
+		log.Infof("service.PatchContainerGpuInfo, container: %s restore %d gpus, uuids: %+v",
+			name, len(uuids[:restoreGpus]), uuids[:restoreGpus])
+		if len(uuids[:spec.GpuCount]) == 0 {
+			// 变为无卡容器
+			info.HostConfig.Resources = container.Resources{}
+			log.Infof("service.PatchContainerGpuInfo, container: %s change to cardless container", name)
+		} else {
+			// 降低配置
+			info.HostConfig.Resources.DeviceRequests[0].DeviceIDs = uuids[restoreGpus:]
+			log.Infof("service.PatchContainerGpuInfo, container: %s reduce %d gpu configuration, now use %d gpus, uuids: %+v",
+				name, restoreGpus, len(uuids[:restoreGpus]), uuids[:restoreGpus])
+		}
 	}
 
 	// 更改 gpu 配置
-	info.HostConfig.Resources.DeviceRequests[0].DeviceIDs = uuids
 	id, newContainerName, err = cs.runContainer(ctx, strings.Split(name, "-")[0], info)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "service.runContainer failed")
@@ -197,7 +237,7 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 		NewResource: newContainerName,
 	}
 
-	return id, newContainerName, err
+	return
 }
 
 func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.ContainerVolumePatch) (id, newContainerName string, err error) {
@@ -234,30 +274,75 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 }
 
 func (cs *ContainerService) StopContainer(name string) error {
+	// 归还 gpu 资源
+	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
+	if err != nil {
+		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+	}
+	gpuscheduler.Scheduler.RestoreGpus(uuids)
+
+	// 停止容器
 	ctx := context.Background()
 	if err := docker.Cli.ContainerStop(ctx, name, container.StopOptions{}); err != nil {
 		return errors.WithMessage(err, "docker.ContainerStop failed")
 	}
-
-	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
-	if err != nil {
-		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
-	}
-	gpuscheduler.Scheduler.RestoreGpus(uuids)
 	return nil
 }
 
-func (cs *ContainerService) RestartContainer(name string) error {
+func (cs *ContainerService) RestartContainer(name string) (id, newContainerName string, err error) {
 	ctx := context.Background()
-	if err := docker.Cli.ContainerRestart(ctx, name, container.StopOptions{}); err != nil {
-		return errors.WithMessage(err, "docker.ContainerRestart failed")
-	}
+	// 获取上次启动时使用的 gpu 资源
 	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
 	if err != nil {
-		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+		return id, newContainerName, errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+
 	}
-	gpuscheduler.Scheduler.RestoreGpus(uuids)
-	return nil
+	if len(uuids) == 0 {
+		// 停止的时候是无卡启动的，直接使用 docker restart 重启
+		if err := docker.Cli.ContainerRestart(ctx, name, container.StopOptions{}); err != nil {
+			return id, newContainerName, errors.Wrapf(err, "docker.ContainerRestart failed, name: %s", name)
+		}
+		log.Infof("cardless container rstart successfully,name: %s", name)
+	}
+
+	// 停止的时候是有卡启动的
+	// 获取 etcd 中关于容器启动的描述
+	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
+	if err != nil {
+		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
+	}
+	var info model.EtcdContainerInfo
+	if err = json.Unmarshal(infoBytes, &info); err != nil {
+		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
+	}
+
+	// 申请 gpu 资源
+	availableGpus, err := gpuscheduler.Scheduler.ApplyGpus(len(uuids))
+	if err != nil {
+		return id, newContainerName, errors.WithMessage(err, "gpuscheduler.Scheduler.ApplyGpus failed")
+	}
+	log.Infof("container: %s apply %d gpus, uuids: %+v", name, len(availableGpus), availableGpus)
+
+	info.HostConfig.Resources.DeviceRequests[0].DeviceIDs = availableGpus
+	// 重启一个容器
+	id, newContainerName, err = cs.runContainer(ctx, strings.Split(name, "-")[0], info)
+	if err != nil {
+		return id, newContainerName, errors.WithMessage(err, "service.runContainer failed")
+	}
+	log.Infof("card container restart successfully, "+
+		"old container name: %s, new container name: %s, "+
+		"old gpu resources: %+v, new gpu resources: %+v",
+		name, newContainerName,
+		uuids, availableGpus)
+
+	// 异步拷贝旧容器的系统盘到新的容器
+	WorkQueue <- &copyTask{
+		Resource:    etcd.ContainerPrefix,
+		OldResource: info.ContainerName,
+		NewResource: newContainerName,
+	}
+
+	return
 }
 
 func (cs *ContainerService) CommitContainer(name string) (string, error) {
@@ -373,9 +458,20 @@ func (cs *ContainerService) copyMergedDirFromOldVersion(src, dest string) error 
 func (cs *ContainerService) containerDeviceRequestsDeviceIDs(name string) ([]string, error) {
 	ctx := context.Background()
 	resp, err := docker.Cli.ContainerInspect(ctx, name)
-	if err != nil || len(resp.HostConfig.DeviceRequests[0].DeviceIDs) == 0 {
+	if err != nil {
 		return nil, errors.Wrapf(err, "docker.ContainerInspect failed, name: %s", name)
 	}
-
+	if resp.HostConfig.DeviceRequests == nil {
+		return []string{}, nil
+	}
 	return resp.HostConfig.DeviceRequests[0].DeviceIDs, nil
+}
+
+func (cs *ContainerService) newContainerResource(uuids []string) container.Resources {
+	return container.Resources{DeviceRequests: []container.DeviceRequest{{
+		Driver:       "nvidia",
+		DeviceIDs:    uuids,
+		Capabilities: [][]string{{"gpu"}},
+		Options:      nil,
+	}}}
 }

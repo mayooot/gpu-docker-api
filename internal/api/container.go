@@ -246,14 +246,18 @@ func (ch *ContainerHandler) restart(c *gin.Context) {
 		ResponseError(c, CodeContainerNameMustContainVersion)
 	}
 
-	if err := cs.RestartContainer(name); err != nil {
+	id, containerName, err := cs.RestartContainer(name)
+	if err != nil {
 		log.Errorf("service.RestartContainer failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
 		ResponseError(c, CodeContainerRestartFailed)
 		return
 	}
 
-	ResponseSuccess(c, nil)
+	ResponseSuccess(c, gin.H{
+		"id":   id,
+		"name": containerName,
+	})
 }
 
 func (ch *ContainerHandler) commit(c *gin.Context) {
