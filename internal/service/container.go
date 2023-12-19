@@ -24,12 +24,12 @@ import (
 
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
+	"github.com/mayooot/gpu-docker-api/internal/gpuscheduler"
 	"github.com/mayooot/gpu-docker-api/internal/model"
+	xerrors "github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 var containerVersionMap = cmap.New[sync2.AtomicInt64]()
-
-var ErrorContainerExisted = errors.New("container already exist")
 
 type ContainerService struct{}
 
@@ -43,7 +43,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 
 	ctx := context.Background()
 	if cs.existContainer(spec.ContainerName) {
-		return id, containerName, errors.Wrapf(ErrorContainerExisted, "container %s", spec.ContainerName)
+		return id, containerName, errors.Wrapf(xerrors.NewContainerExistedError(), "container %s", spec.ContainerName)
 	}
 
 	config = container.Config{
@@ -63,21 +63,14 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 
 	if !spec.Cardless {
 		// 有卡模式启动容器
-
-		// @custom
-		// ===== 模拟选卡的过程 =====
-		var gpuIDs []string
-		if spec.GpuCount == 1 {
-			gpuIDs = append(gpuIDs, "0")
-		} else if spec.GpuCount == 3 {
-			gpuIDs = append(gpuIDs, "0", "1", "2")
+		uuids, err := gpuscheduler.Scheduler.ApplyGpus(spec.GpuCount)
+		if err != nil {
+			return id, containerName, errors.Wrapf(err, "gpuscheduler.ApplyGpus failed, spec: %+v", spec)
 		}
-		// ===== 模拟选卡的过程 =====
 
 		hostConfig.Resources = container.Resources{DeviceRequests: []container.DeviceRequest{{
-			Driver: "nvidia",
-			//Count:  spec.GpuCount,
-			DeviceIDs:    gpuIDs,
+			Driver:       "nvidia",
+			DeviceIDs:    uuids,
 			Capabilities: [][]string{{"gpu"}},
 			Options:      nil,
 		}}}
@@ -119,6 +112,12 @@ func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDe
 	if err = docker.Cli.ContainerRemove(ctx, name, types.ContainerRemoveOptions{Force: spec.Force}); err != nil {
 		return errors.Wrapf(err, "docker.ContainerRemove failed, name: %s", name)
 	}
+
+	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
+	if err != nil {
+		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+	}
+	gpuscheduler.Scheduler.RestoreGpus(uuids)
 
 	if spec.DelEtcdInfo {
 		WorkQueue <- etcd.DelKey{
@@ -179,16 +178,13 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
-	// todo
-	// ===== 模拟选卡的过程 =====
-	var gpuIDs []string
-	if spec.GpuCount == 3 {
-		gpuIDs = append(gpuIDs, "1", "2", "3")
+	uuids, err := gpuscheduler.Scheduler.ApplyGpus(spec.GpuCount)
+	if err != nil {
+		return id, newContainerName, errors.WithMessage(err, "gpuscheduler.Scheduler.ApplyGpus failed")
 	}
-	// ===== 模拟选卡的过程 =====
 
 	// 更改 gpu 配置
-	info.HostConfig.Resources.DeviceRequests[0].DeviceIDs = gpuIDs
+	info.HostConfig.Resources.DeviceRequests[0].DeviceIDs = uuids
 	id, newContainerName, err = cs.runContainer(ctx, strings.Split(name, "-")[0], info)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "service.runContainer failed")
@@ -242,6 +238,12 @@ func (cs *ContainerService) StopContainer(name string) error {
 	if err := docker.Cli.ContainerStop(ctx, name, container.StopOptions{}); err != nil {
 		return errors.WithMessage(err, "docker.ContainerStop failed")
 	}
+
+	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
+	if err != nil {
+		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+	}
+	gpuscheduler.Scheduler.RestoreGpus(uuids)
 	return nil
 }
 
@@ -250,6 +252,11 @@ func (cs *ContainerService) RestartContainer(name string) error {
 	if err := docker.Cli.ContainerRestart(ctx, name, container.StopOptions{}); err != nil {
 		return errors.WithMessage(err, "docker.ContainerRestart failed")
 	}
+	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
+	if err != nil {
+		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+	}
+	gpuscheduler.Scheduler.RestoreGpus(uuids)
 	return nil
 }
 
@@ -360,4 +367,15 @@ func (cs *ContainerService) copyMergedDirFromOldVersion(src, dest string) error 
 	}
 	log.Infof("service.copyDiffFromOldVersion copy merged successfully, src: %s, dest: %s, time cost: %v", src, dest, time.Since(startT))
 	return nil
+}
+
+// 获取容器使用的 GPU 列表 （UUID）
+func (cs *ContainerService) containerDeviceRequestsDeviceIDs(name string) ([]string, error) {
+	ctx := context.Background()
+	resp, err := docker.Cli.ContainerInspect(ctx, name)
+	if err != nil || len(resp.HostConfig.DeviceRequests[0].DeviceIDs) == 0 {
+		return nil, errors.Wrapf(err, "docker.ContainerInspect failed, name: %s", name)
+	}
+
+	return resp.HostConfig.DeviceRequests[0].DeviceIDs, nil
 }

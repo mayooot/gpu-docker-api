@@ -5,12 +5,12 @@ import (
 )
 
 var (
-	defaultHost = "unix:///var/run/docker.sock"
-	Cli         *client.Client
+	//defaultHost = "unix:///var/run/docker.sock"
+	Cli *client.Client
 )
 
 func InitDockerClient() (err error) {
-	Cli, err = client.NewClientWithOpts(client.WithHost(defaultHost), client.WithAPIVersionNegotiation())
+	Cli, err = client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	return err
 }
 

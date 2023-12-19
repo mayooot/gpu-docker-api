@@ -9,6 +9,7 @@ import (
 
 	"github.com/mayooot/gpu-docker-api/internal/model"
 	"github.com/mayooot/gpu-docker-api/internal/service"
+	xerrors "github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 var cs service.ContainerService
@@ -46,6 +47,12 @@ func (ch *ContainerHandler) run(c *gin.Context) {
 		return
 	}
 
+	if spec.GpuCount < 0 {
+		log.Error("failed to create container, gpu count must be greater than 0")
+		ResponseError(c, CodeContainerGpuCountMustGreaterThanZero)
+		return
+	}
+
 	if strings.Contains(spec.ContainerName, "-") {
 		log.Error("failed to create container, container name: %s must container '-'", spec.ContainerName)
 		ResponseError(c, CodeContainerNameNotContainsSpecialChar)
@@ -56,8 +63,12 @@ func (ch *ContainerHandler) run(c *gin.Context) {
 	if err != nil {
 		log.Errorf("service.RunGpuContainer failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
-		if errors.Is(err, service.ErrorContainerExisted) {
+		if xerrors.IsContainerExistedError(err) {
 			ResponseError(c, CodeContainerExisted)
+			return
+		}
+		if xerrors.IsGpuNotEnoughError(err) {
+			ResponseError(c, CodeContainerGpuNotEnough)
 			return
 		}
 		ResponseError(c, CodeContainerRunFailed)
@@ -79,7 +90,7 @@ func (ch *ContainerHandler) delete(c *gin.Context) {
 	}
 
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
-		log.Errorf("failed to delete container, name must be in format: name-version", name)
+		log.Errorf("failed to delete container, name %s must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
 	}
 

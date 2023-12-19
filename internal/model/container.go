@@ -8,7 +8,6 @@ type ContainerRun struct {
 	ImageName     string   `json:"imageName"`
 	ContainerName string   `json:"containerName"`
 	GpuCount      int      `json:"gpuCount,omitempty"`
-	GpuNumbers    []string `json:"gpuNumbers,omitempty"`
 	Cardless      bool     `json:"cardless,omitempty"`
 	Binds         []Bind   `json:"binds,omitempty"`
 	Env           []string `json:"env,omitempty"`
