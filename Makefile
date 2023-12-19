@@ -15,17 +15,17 @@ BIN_DIR=${CURRENT_DIR}/bin
 LDFLAGS = -ldflags "-X main.BRANCH=${BRANCH} -X main.VERSION=${VERSION} -X main.COMMIT=${COMMIT} -X main.GO_VERSION=${GO_VERSION} -X main.BUILD_TIME=${BUILD_TIME}"
 
 linux:
-	@cd ${BUILD_DIR}; \
+	cd ${BUILD_DIR}; \
 	GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${BIN_DIR}/${BINARY}-linux-${GOARCH} . ; \
 	cd - >/dev/null
 
 darwin:
-	@cd ${BUILD_DIR}; \
+	cd ${BUILD_DIR}; \
 	GOOS=darwin GOARCH=${GOARCH} go build ${LDFLAGS} -o ${BIN_DIR}/${BINARY}-darwin-${GOARCH} . ; \
 	cd - >/dev/null
 
 windows:
-	@cd ${BUILD_DIR}; \
+	cd ${BUILD_DIR}; \
 	GOOS=windows GOARCH=${GOARCH} go build ${LDFLAGS} -o ${BIN_DIR}/${BINARY}-windows-${GOARCH}.exe . ; \
 	cd - >/dev/null
 
@@ -38,4 +38,4 @@ fmt:
 imports:
 	goimports-reviser --rm-unused -local github.com/${GITHUB_USER}/${BINARY} -format ./...
 
-.PHONY: linux fmt imports
+.PHONY: linux darwin windows clean fmt imports
