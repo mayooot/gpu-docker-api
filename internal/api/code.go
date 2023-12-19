@@ -25,6 +25,7 @@ const (
 	CodeContainerRestartFailed
 	CodeContainerGpuCountMustGreaterThanZero
 	CodeContainerGpuNotEnough
+	CodeContainerGpuNoNeedPatch
 
 	CodeVolumeCreateFailed
 	CodeVolumeNameNotNull
@@ -58,6 +59,7 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerRestartFailed:               "容器重启动失败",
 	CodeContainerGpuCountMustGreaterThanZero: "容器 GPU 数量必须大于 0",
 	CodeContainerGpuNotEnough:                "没有足够的 GPU 资源",
+	CodeContainerGpuNoNeedPatch:              "容器 GPU 资源不需要更新，因为更新前后数量一样",
 
 	CodeVolumeCreateFailed:           "卷创建失败",
 	CodeVolumeNameNotNull:            "卷名不能为空",

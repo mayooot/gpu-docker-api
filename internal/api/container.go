@@ -200,6 +200,10 @@ func (ch *ContainerHandler) pathVolumeInfo(c *gin.Context) {
 	if err != nil {
 		log.Errorf("service.PatchContainerVolumeInfo failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
+		if xerrors.IsNoPatchRequiredError(err) {
+			ResponseError(c, CodeContainerGpuNoNeedPatch)
+			return
+		}
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)
 		return
 	}
