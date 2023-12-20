@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -40,7 +41,7 @@ func (vh *VolumeHandler) create(c *gin.Context) {
 	if err != nil {
 		log.Errorf("service.CreateVolume failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
-		if errors.Is(err, service.ErrorVolumeExisted) {
+		if xerrors.IsVolumeExistedError(err) {
 			ResponseError(c, CodeVolumeExisted)
 			return
 		}

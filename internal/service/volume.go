@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 	"strings"
 	"time"
 
@@ -22,14 +23,12 @@ import (
 
 var volumeVersionMap = cmap.New[sync2.AtomicInt64]()
 
-var ErrorVolumeExisted = errors.New("volume already exist")
-
 type VolumeService struct{}
 
 func (vs *VolumeService) CreateVolume(spec *model.VolumeCreate) (resp volume.Volume, err error) {
 	ctx := context.Background()
 	if vs.existVolume(spec.Name) {
-		return resp, errors.Wrapf(ErrorVolumeExisted, "volume %s", spec.Name)
+		return resp, errors.Wrapf(xerrors.NewVolumeExistedError(), "volume %s", spec.Name)
 	}
 
 	var opt volume.CreateOptions
@@ -47,9 +46,7 @@ func (vs *VolumeService) CreateVolume(spec *model.VolumeCreate) (resp volume.Vol
 	if err != nil {
 		return resp, errors.WithMessage(err, "service.createVolume failed")
 	}
-
-	log.Infof("volume created successfully, name: %s, spec: %+v", resp.Name, spec)
-	return resp, err
+	return
 }
 
 func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolumeInfo) (resp volume.Volume, err error) {
@@ -75,8 +72,8 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 		Value:    val.Serialize(),
 		Resource: etcd.VolumePrefix,
 	}
-
-	return resp, err
+	log.Infof("serivce.createVolume, volume created successfully, name: %s, spec: %+v", resp.Name, info)
+	return
 }
 
 func (vs *VolumeService) DeleteVolume(name string, spec *model.VolumeDelete) error {
@@ -91,7 +88,7 @@ func (vs *VolumeService) DeleteVolume(name string, spec *model.VolumeDelete) err
 			Key:      name,
 		}
 	}
-	log.Infof("volume deleted successfully, name: %s", name)
+	log.Infof("service.DeleteVolume, volume deleted successfully, name: %s", name)
 	return nil
 }
 
@@ -121,8 +118,8 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 		OldResource: name,
 		NewResource: resp.Name,
 	}
-
-	return resp, err
+	log.Infof("service.PatchVolumeSize, volume size patched successfully, name: %s, spec: %+v", name, spec)
+	return
 }
 
 func (vs *VolumeService) volumeMountpoint(name string) (string, error) {
