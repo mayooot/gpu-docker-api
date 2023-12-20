@@ -32,6 +32,9 @@ const (
 	CodeVolumeDeleteFailed
 	CodeVolumeExisted
 	CodeVolumeNameMustContainVersion
+	CodeVolumeSizeNoNeedPatch
+	CodeVolumeSizeNotSupported
+	CodeVolumeSizeUsedGreaterThanReduce
 
 	CodeEtcdDeleteFailed
 )
@@ -61,11 +64,14 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerGpuNotEnough:                "没有足够的 GPU 资源",
 	CodeContainerGpuNoNeedPatch:              "容器 GPU 资源不需要更新，因为更新前后数量一样",
 
-	CodeVolumeCreateFailed:           "卷创建失败",
-	CodeVolumeNameNotNull:            "卷名不能为空",
-	CodeVolumeDeleteFailed:           "卷删除失败",
-	CodeVolumeExisted:                "卷已存在",
-	CodeVolumeNameMustContainVersion: "卷名必须包含版本号",
+	CodeVolumeCreateFailed:              "卷创建失败",
+	CodeVolumeNameNotNull:               "卷名不能为空",
+	CodeVolumeDeleteFailed:              "卷删除失败",
+	CodeVolumeExisted:                   "卷已存在",
+	CodeVolumeNameMustContainVersion:    "卷名必须包含版本号",
+	CodeVolumeSizeNoNeedPatch:           "卷大小不需要更新，因为更新前后大小一样",
+	CodeVolumeSizeNotSupported:          "卷大小单位不支持，支持的单位：KB, MB, GB, TB",
+	CodeVolumeSizeUsedGreaterThanReduce: "卷大小更新失败，因为更新后的大小小于已使用的大小",
 
 	CodeEtcdDeleteFailed: "删除 etcd 中的资源失败",
 }

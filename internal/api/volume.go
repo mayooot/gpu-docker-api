@@ -104,11 +104,26 @@ func (vh *VolumeHandler) patchSize(c *gin.Context) {
 		ResponseError(c, CodeInvalidParams)
 		return
 	}
+	spec.Size = strings.ToUpper(spec.Size)
+	unit := spec.Size[len(spec.Size)-2:]
+	if _, ok := model.VolumeSizeMap[unit]; !ok {
+		log.Errorf("failed to patch volume size, size: %s is not supported", spec.Size)
+		ResponseError(c, CodeVolumeSizeNotSupported)
+		return
+	}
 
 	resp, err := vs.PatchVolumeSize(name, &spec)
 	if err != nil {
 		log.Errorf("service.PatchVolumeSize failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
+		if xerrors.IsNoPatchRequiredError(err) {
+			ResponseError(c, CodeVolumeSizeNoNeedPatch)
+			return
+		}
+		if xerrors.IsVolumeSizeUsedGreaterThanReduced(err) {
+			ResponseError(c, CodeVolumeSizeNoNeedPatch)
+			return
+		}
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)
 		return
 	}

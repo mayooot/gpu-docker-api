@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
+	"github.com/mayooot/gpu-docker-api/utils"
 	"strings"
 	"time"
 
@@ -72,7 +73,7 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 		Value:    val.Serialize(),
 		Resource: etcd.VolumePrefix,
 	}
-	log.Infof("serivce.createVolume, volume created successfully, name: %s, spec: %+v", resp.Name, info)
+	log.Infof("serivce.createVolume, volume created successfully, name: %s, opt: %+v, version: %d", resp.Name, *info.Opt, info.Version)
 	return
 }
 
@@ -82,30 +83,61 @@ func (vs *VolumeService) DeleteVolume(name string, spec *model.VolumeDelete) err
 		return errors.Wrapf(err, "docker.VolumeRemove failed, name: %s", name)
 	}
 
-	if spec.DelEtcdInfo {
+	if spec.DelEtcdInfoAndVersionRecord {
+		volumeVersionMap.Remove(strings.Split(name, "-")[0])
 		WorkQueue <- etcd.DelKey{
 			Resource: etcd.VolumePrefix,
 			Key:      name,
 		}
+		log.Infof("service.DeleteVolume, volume: %s will be del etcd info and version record", name)
 	}
 	log.Infof("service.DeleteVolume, volume deleted successfully, name: %s", name)
 	return nil
 }
 
 func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (resp volume.Volume, err error) {
+	fmt.Println("12312321312312313")
 	ctx := context.Background()
+	// 从 etcd 中获取创建 volume 的描述信息
 	infoBytes, err := etcd.Get(etcd.VolumePrefix, name)
 	if err != nil {
 		return resp, errors.WithMessage(err, "etcd.Get failed")
 	}
-
 	var info model.EtcdVolumeInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
 		return resp, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
+	preSize := info.Opt.DriverOpts["size"]
+	preSizeBytes, _ := utils.ToBytes(preSize)
+	patchSize := spec.Size
+	patchSizeBytes, _ := utils.ToBytes(patchSize)
+
+	if patchSize == preSize {
+		// 如果 patch 前后 size 相同，直接返回
+		return resp, errors.Wrapf(xerrors.NewNoPatchRequiredError(), "volume: %s", name)
+	}
+
+	if patchSizeBytes < preSizeBytes {
+		fmt.Println("缩容操作开始")
+		// 缩容操作
+		// 需要判断已经使用的 volume 容量是否大于缩容后的容量
+		mountpoint, err := vs.volumeMountpoint(name)
+		if err != nil {
+			return resp, errors.WithMessage(err, "service.volumeMountpoint failed")
+		}
+		usedSize, err := utils.DirSize(mountpoint)
+		if err != nil {
+			return resp, errors.Wrapf(err, "utils.DirSize failed, volume: %s, mountpoint: %s", name, mountpoint)
+		}
+
+		if usedSize > patchSizeBytes {
+			return resp, errors.Wrapf(xerrors.NewVolumeSizeUsedGreaterThanReduced(),
+				"volume: %s, usedSize: %d, patchSize: %d", name, usedSize, patchSizeBytes)
+		}
+	}
 	// 更改 volume 的 size
-	info.Opt.DriverOpts["size"] = spec.Size
+	info.Opt.DriverOpts["size"] = patchSize
 	info.Opt.Name = strings.Split(name, "-")[0]
 	resp, err = vs.createVolume(ctx, info)
 	if err != nil {
@@ -118,7 +150,8 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 		OldResource: name,
 		NewResource: resp.Name,
 	}
-	log.Infof("service.PatchVolumeSize, volume size patched successfully, name: %s, spec: %+v", name, spec)
+	log.Infof("service.PatchVolumeSize, volume size patched successfully, old name: %s, old size: %s, new name: %s, new size: %s",
+		name, preSize, resp.Name, patchSize)
 	return
 }
 

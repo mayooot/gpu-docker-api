@@ -1,5 +1,12 @@
 package model
 
+var VolumeSizeMap = map[string]struct{}{
+	"KB": {},
+	"MB": {},
+	"GB": {},
+	"TB": {},
+}
+
 type Bind struct {
 	Src  string `json:"src"`
 	Dest string `json:"dest"`
@@ -11,10 +18,10 @@ type VolumeCreate struct {
 }
 
 type VolumeSize struct {
-	Size string `json:"size"`
+	Size string `json:"size"` // KB, MB, GB, TB
 }
 
 type VolumeDelete struct {
-	Force       bool `json:"force"`
-	DelEtcdInfo bool `json:"delEtcdInfo"`
+	Force                       bool `json:"force"`
+	DelEtcdInfoAndVersionRecord bool `json:"delEtcdInfoAndVersionRecord"`
 }
