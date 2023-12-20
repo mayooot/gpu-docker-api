@@ -8,7 +8,6 @@ type ContainerRun struct {
 	ImageName     string   `json:"imageName"`
 	ContainerName string   `json:"containerName"`
 	GpuCount      int      `json:"gpuCount,omitempty"`
-	Cardless      bool     `json:"cardless,omitempty"`
 	Binds         []Bind   `json:"binds,omitempty"`
 	Env           []string `json:"env,omitempty"`
 	Cmd           []string `json:"cmd,omitempty"`
@@ -36,6 +35,6 @@ type ContainerVolumePatch struct {
 }
 
 type ContainerDelete struct {
-	Force       bool `json:"force"`
-	DelEtcdInfo bool `json:"delEtcdInfo"`
+	Force                       bool `json:"force"`
+	DelEtcdInfoAndVersionRecord bool `json:"delEtcdInfoAndVersionRecord"`
 }

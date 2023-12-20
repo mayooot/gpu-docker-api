@@ -79,8 +79,10 @@ func (p *program) Start() error {
 	var (
 		ch api.ContainerHandler
 		vh api.VolumeHandler
+		gh api.GpuHandler
 	)
 
+	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -91,6 +93,7 @@ func (p *program) Start() error {
 	apiv1 := r.Group("/api/v1")
 	ch.RegisterRoute(apiv1)
 	vh.RegisterRoute(apiv1)
+	gh.RegisterRoute(apiv1)
 
 	go func() {
 		_ = r.Run(p.cfg.Port)

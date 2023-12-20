@@ -43,6 +43,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 
 	ctx := context.Background()
 	if cs.existContainer(spec.ContainerName) {
+		log.Infof("service.RunGpuContainer, container %s existed, skip", spec.ContainerName)
 		return id, containerName, errors.Wrapf(xerrors.NewContainerExistedError(), "container %s", spec.ContainerName)
 	}
 
@@ -61,14 +62,14 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 		}}
 	}
 
-	if !spec.Cardless {
+	if spec.GpuCount > 0 {
 		// 有卡模式启动容器
 		uuids, err := gpuscheduler.Scheduler.ApplyGpus(spec.GpuCount)
 		if err != nil {
 			return id, containerName, errors.Wrapf(err, "gpuscheduler.ApplyGpus failed, spec: %+v", spec)
 		}
-
 		hostConfig.Resources = cs.newContainerResource(uuids)
+		log.Infof("service.RunGpuContainer, container: %s apply %d gpus, uuids: %+v", spec.ContainerName+"-0", len(uuids), uuids)
 	}
 
 	// 卷挂载
@@ -98,7 +99,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 	if err != nil {
 		return id, containerName, errors.Wrapf(err, "serivce.runContainer failed, spec: %+v", spec)
 	}
-	return id, containerName, err
+	return
 }
 
 func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDelete) error {
@@ -117,13 +118,15 @@ func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDe
 	}
 
 	// 是否需要异步删除 etcd 中关于容器的描述
-	if spec.DelEtcdInfo {
+	if spec.DelEtcdInfoAndVersionRecord {
+		containerVersionMap.Remove(strings.Split(name, "-")[0])
 		WorkQueue <- etcd.DelKey{
 			Resource: etcd.ContainerPrefix,
 			Key:      name,
 		}
+		log.Infof("service.DeleteContainer, container: %s will be del etcd info and version record", name)
 	}
-	log.Info("container deleted successfully, name:", name)
+	log.Infof("service.DeleteContainer, container: %s delete successfully", name)
 	return err
 }
 
@@ -160,8 +163,8 @@ func (cs *ContainerService) ExecuteContainer(name string, exec *model.ContainerE
 	_, _ = stdcopy.StdCopy(&buf, &buf, hijackedResp.Reader)
 	str := buf.String()
 	resp = &str
-
-	return resp, err
+	log.Infof("service.ExecuteContainer, container: %s execute successfully, exec: %+v", name, exec)
+	return
 }
 
 func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.ContainerGpuPatch) (id, newContainerName string, err error) {
@@ -236,7 +239,7 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 		OldResource: info.ContainerName,
 		NewResource: newContainerName,
 	}
-
+	log.Infof("service.PatchContainerGpuInfo, container: %s patch gpu info successfully", name)
 	return
 }
 
@@ -270,7 +273,8 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 		NewResource: newContainerName,
 	}
 
-	return id, newContainerName, err
+	log.Infof("service.PatchContainerVolumeInfo, container: %s patch volume info successfully", name)
+	return
 }
 
 func (cs *ContainerService) StopContainer(name string) error {
@@ -280,12 +284,15 @@ func (cs *ContainerService) StopContainer(name string) error {
 		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
 	}
 	gpuscheduler.Scheduler.RestoreGpus(uuids)
+	log.Infof("service.StopContainer, container: %s restore %d gpus, uuids: %+v",
+		name, len(uuids), uuids)
 
 	// 停止容器
 	ctx := context.Background()
 	if err := docker.Cli.ContainerStop(ctx, name, container.StopOptions{}); err != nil {
 		return errors.WithMessage(err, "docker.ContainerStop failed")
 	}
+	log.Infof("service.StopContainer, container: %s stop successfully", name)
 	return nil
 }
 
@@ -302,7 +309,15 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 		if err := docker.Cli.ContainerRestart(ctx, name, container.StopOptions{}); err != nil {
 			return id, newContainerName, errors.Wrapf(err, "docker.ContainerRestart failed, name: %s", name)
 		}
-		log.Infof("cardless container rstart successfully,name: %s", name)
+		resp, err := docker.Cli.ContainerInspect(ctx, name)
+		if err != nil {
+			return id, newContainerName, errors.Wrapf(err, "docker.ContainerInspect failed, name: %s", name)
+		}
+
+		id = resp.ID
+		newContainerName = name
+		log.Infof("service.RestartContainer, cardless container: %s restart successfully", name)
+		return
 	}
 
 	// 停止的时候是有卡启动的
@@ -321,7 +336,7 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "gpuscheduler.Scheduler.ApplyGpus failed")
 	}
-	log.Infof("container: %s apply %d gpus, uuids: %+v", name, len(availableGpus), availableGpus)
+	log.Infof("service.RestartContainer, card container: %s apply %d gpus, uuids: %+v", name, len(availableGpus), availableGpus)
 
 	info.HostConfig.Resources.DeviceRequests[0].DeviceIDs = availableGpus
 	// 重启一个容器
@@ -329,12 +344,6 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "service.runContainer failed")
 	}
-	log.Infof("card container restart successfully, "+
-		"old container name: %s, new container name: %s, "+
-		"old gpu resources: %+v, new gpu resources: %+v",
-		name, newContainerName,
-		uuids, availableGpus)
-
 	// 异步拷贝旧容器的系统盘到新的容器
 	WorkQueue <- &copyTask{
 		Resource:    etcd.ContainerPrefix,
@@ -342,23 +351,29 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 		NewResource: newContainerName,
 	}
 
+	log.Infof("service.RestartContainer, card container restart successfully, "+
+		"old container name: %s, new container name: %s, "+
+		"old gpu resources: %+v, new gpu resources: %+v",
+		name, newContainerName,
+		uuids, availableGpus)
 	return
 }
 
-func (cs *ContainerService) CommitContainer(name string) (string, error) {
+func (cs *ContainerService) CommitContainer(name string) (id string, err error) {
 	ctx := context.Background()
 	resp, err := docker.Cli.ContainerCommit(ctx, name, types.ContainerCommitOptions{
 		Comment: fmt.Sprintf("container name %s, commit time: %s", name, time.Now().Format("2006-01-02 15:04:05")),
 	})
 	if err != nil {
-		return "", errors.WithMessage(err, "docker.ContainerRestart failed")
+		return id, errors.WithMessage(err, "docker.ContainerRestart failed")
 	}
 
 	if err = docker.Cli.ImageTag(ctx, resp.ID, name); err != nil {
-		return "", errors.WithMessage(err, "docker.ImageTag failed")
+		return id, errors.WithMessage(err, "docker.ImageTag failed")
 	}
-
-	return resp.ID, err
+	id = resp.ID
+	log.Infof("service.CommitContainer, container: %s commit successfully", name)
+	return
 }
 
 func (cs *ContainerService) runContainer(ctx context.Context, name string, info model.EtcdContainerInfo) (id, containerName string, err error) {
@@ -401,9 +416,8 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 		Value:    val.Serialize(),
 		Resource: etcd.ContainerPrefix,
 	}
-
-	log.Infof("container started successfully, id: %s, name: %s", id, containerName)
-	return id, containerName, err
+	log.Infof("service.runContainer, container: %s run successfully", containerName)
+	return
 }
 
 func (cs *ContainerService) existContainer(name string) bool {
