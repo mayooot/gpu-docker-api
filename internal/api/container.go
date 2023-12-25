@@ -12,18 +12,26 @@ import (
 	xerrors "github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
-var cs service.ContainerService
-
 type ContainerHandler struct{}
 
+var cs service.ContainerService
+
 func (ch *ContainerHandler) RegisterRoute(g *gin.RouterGroup) {
+	// 创建容器
 	g.POST("/containers", ch.run)
+	// 删除容器
 	g.DELETE("/containers/:name", ch.delete)
+	// 执行容器
 	g.POST("/containers/:name/execute", ch.execute)
+	// 变更已存在容器的 GPU 资源
 	g.PATCH("/containers/:name/gpu", ch.patchGpuInfo)
+	// 变更已存在容器的 Volume 资源
 	g.PATCH("/containers/:name/volume", ch.pathVolumeInfo)
+	// 停止容器
 	g.PATCH("/containers/:name/stop", ch.stop)
+	// 重启容器
 	g.PATCH("/containers/:name/restart", ch.restart)
+	// 提交容器为镜像
 	g.POST("/containers/:name/commit", ch.commit)
 }
 
@@ -55,7 +63,7 @@ func (ch *ContainerHandler) run(c *gin.Context) {
 
 	if strings.Contains(spec.ContainerName, "-") {
 		log.Error("failed to create container, container name: %s must container '-'", spec.ContainerName)
-		ResponseError(c, CodeContainerNameNotContainsSpecialChar)
+		ResponseError(c, CodeContainerNameNotContainsDash)
 		return
 	}
 
@@ -277,7 +285,14 @@ func (ch *ContainerHandler) commit(c *gin.Context) {
 		ResponseError(c, CodeContainerNameMustContainVersion)
 	}
 
-	id, err := cs.CommitContainer(name)
+	var spec model.ContainerCommit
+	if err := c.ShouldBindJSON(&spec); err != nil {
+		log.Error("failed to commit container, error:", err.Error())
+		ResponseError(c, CodeInvalidParams)
+		return
+	}
+
+	id, err := cs.CommitContainer(name, spec)
 	if err != nil {
 		log.Errorf("service.RestartContainer failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)

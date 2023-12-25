@@ -1,7 +1,6 @@
 package api
 
 import (
-	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -10,15 +9,19 @@ import (
 
 	"github.com/mayooot/gpu-docker-api/internal/model"
 	"github.com/mayooot/gpu-docker-api/internal/service"
+	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
-
-var vs service.VolumeService
 
 type VolumeHandler struct{}
 
+var vs service.VolumeService
+
 func (vh *VolumeHandler) RegisterRoute(g *gin.RouterGroup) {
+	// 创建 Volume
 	g.POST("/volumes", vh.create)
+	// 删除 Volume
 	g.DELETE("/volumes/:name", vh.delete)
+	// 变更已存在 Volume 的大小
 	g.PATCH("/volumes/:name/size", vh.patchSize)
 }
 
@@ -33,7 +36,13 @@ func (vh *VolumeHandler) create(c *gin.Context) {
 
 	if strings.Contains(spec.Name, "-") {
 		log.Errorf("failed to create volume, volume name: %s must contain '-'", spec.Name)
-		ResponseError(c, CodeContainerNameNotContainsSpecialChar)
+		ResponseError(c, CodeVolumeNameNotContainsDash)
+		return
+	}
+
+	if strings.HasPrefix(spec.Name, "/") {
+		log.Errorf("failed to create volume, volume name: %s not begin with '/'", spec.Name)
+		ResponseError(c, CodeVolumeNameNotBeginWithForwardSlash)
 		return
 	}
 

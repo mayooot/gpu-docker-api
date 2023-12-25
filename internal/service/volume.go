@@ -4,12 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/mayooot/gpu-docker-api/internal/xerrors"
-	"github.com/mayooot/gpu-docker-api/utils"
 	"strings"
-	"time"
 
-	"github.com/commander-cli/cmd"
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/ngaut/log"
@@ -20,27 +16,35 @@ import (
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/model"
+	"github.com/mayooot/gpu-docker-api/internal/workQueue"
+	"github.com/mayooot/gpu-docker-api/internal/xerrors"
+	"github.com/mayooot/gpu-docker-api/utils"
 )
-
-var volumeVersionMap = cmap.New[sync2.AtomicInt64]()
 
 type VolumeService struct{}
 
+// volumeVersionMap 用于跟踪 Volume 的版本信息
+var volumeVersionMap = cmap.New[sync2.AtomicInt64]()
+
+// CreateVolume 创建一个可指定名称和大小的 Volume
 func (vs *VolumeService) CreateVolume(spec *model.VolumeCreate) (resp volume.Volume, err error) {
 	ctx := context.Background()
+	// 如果 Volume 已存在，则返回错误
 	if vs.existVolume(spec.Name) {
 		return resp, errors.Wrapf(xerrors.NewVolumeExistedError(), "volume %s", spec.Name)
 	}
 
-	var opt volume.CreateOptions
+	opt := volume.CreateOptions{Driver: "local"}
+	// 设置 Volume 的名称
 	if len(spec.Name) != 0 {
 		opt.Name = spec.Name
 	}
+	// 设置 Volume 的大小
 	if len(spec.Size) != 0 {
 		opt.DriverOpts = map[string]string{"size": spec.Size}
 	}
 
-	opt.Driver = "local"
+	// 创建 Volume
 	resp, err = vs.createVolume(ctx, model.EtcdVolumeInfo{
 		Opt: &opt,
 	})
@@ -50,7 +54,9 @@ func (vs *VolumeService) CreateVolume(spec *model.VolumeCreate) (resp volume.Vol
 	return
 }
 
+// 真正创建 Volume 的方法，参考 runContainer 方法
 func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolumeInfo) (resp volume.Volume, err error) {
+	// 获取卷的版本信息
 	version, ok := volumeVersionMap.Get(info.Opt.Name)
 	if !ok {
 		volumeVersionMap.Set(info.Opt.Name, 0)
@@ -58,17 +64,20 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 		volumeVersionMap.Set(info.Opt.Name, sync2.AtomicInt64(version.Add(1)))
 	}
 
+	// 生成此次要创建的 Volume 的名称
 	info.Opt.Name = fmt.Sprintf("%s-%d", info.Opt.Name, version)
 	resp, err = docker.Cli.VolumeCreate(ctx, *info.Opt)
 	if err != nil {
 		return resp, errors.Wrapf(err, "docker.VolumeCreate failed, opt: %+v", info)
 	}
 
+	// 经过 docker volume create 校验后的容器配置，放入到 etcd 中
 	val := &model.EtcdVolumeInfo{
 		Opt:     info.Opt,
 		Version: version.Get(),
 	}
-	WorkQueue <- etcd.PutKeyValue{
+	// 异步添加到 etcd 中
+	workQueue.Queue <- etcd.PutKeyValue{
 		Key:      info.Opt.Name,
 		Value:    val.Serialize(),
 		Resource: etcd.VolumePrefix,
@@ -77,28 +86,34 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 	return
 }
 
+// DeleteVolume 删除一个 Volume
 func (vs *VolumeService) DeleteVolume(name string, spec *model.VolumeDelete) error {
+	var err error
 	ctx := context.Background()
-	if err := docker.Cli.VolumeRemove(ctx, name, spec.Force); err != nil {
+	if err = docker.Cli.VolumeRemove(ctx, name, spec.Force); err != nil {
 		return errors.Wrapf(err, "docker.VolumeRemove failed, name: %s", name)
 	}
 
+	// 是否需要异步删除 etcd 中关于容器的描述和版本号记录
 	if spec.DelEtcdInfoAndVersionRecord {
 		volumeVersionMap.Remove(strings.Split(name, "-")[0])
-		WorkQueue <- etcd.DelKey{
+		workQueue.Queue <- etcd.DelKey{
 			Resource: etcd.VolumePrefix,
 			Key:      name,
 		}
 		log.Infof("service.DeleteVolume, volume: %s will be del etcd info and version record", name)
 	}
 	log.Infof("service.DeleteVolume, volume deleted successfully, name: %s", name)
-	return nil
+	return err
 }
 
+// PatchVolumeSize 变更 Volume 的大小
+// 包括扩容和缩容两个操作，如果操作前后的大小相同，则直接返回，不做任何操作
+// 需要注意的是，缩容操作会判断已经使用的 Volume 大小是否大于缩容之后的 Volume 大小，如果大于，则返回错误
+// 例如：缩容前的 Volume 大小为 10G，缩容后的 Volume 大小为 5G，但是已经使用了 6G，则返回错误
 func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (resp volume.Volume, err error) {
-	fmt.Println("12312321312312313")
+	// 从 etcd 中获取 Volume 的描述
 	ctx := context.Background()
-	// 从 etcd 中获取创建 volume 的描述信息
 	infoBytes, err := etcd.Get(etcd.VolumePrefix, name)
 	if err != nil {
 		return resp, errors.WithMessage(err, "etcd.Get failed")
@@ -108,21 +123,20 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 		return resp, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
+	// 获取修改前的卷大小和修改后的卷大小
 	preSize := info.Opt.DriverOpts["size"]
 	preSizeBytes, _ := utils.ToBytes(preSize)
 	patchSize := spec.Size
 	patchSizeBytes, _ := utils.ToBytes(patchSize)
 
+	// 如果修改前后的大小相同，则直接返回
 	if patchSize == preSize {
-		// 如果 patch 前后 size 相同，直接返回
 		return resp, errors.Wrapf(xerrors.NewNoPatchRequiredError(), "volume: %s", name)
 	}
 
 	if patchSizeBytes < preSizeBytes {
-		fmt.Println("缩容操作开始")
-		// 缩容操作
-		// 需要判断已经使用的 volume 容量是否大于缩容后的容量
-		mountpoint, err := vs.volumeMountpoint(name)
+		// 如果是缩容操作，需要判断已经使用的卷容量是否大于缩容后的容量
+		mountpoint, err := workQueue.VolumeMountPoint(name)
 		if err != nil {
 			return resp, errors.WithMessage(err, "service.volumeMountpoint failed")
 		}
@@ -136,16 +150,19 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 				"volume: %s, usedSize: %d, patchSize: %d", name, usedSize, patchSizeBytes)
 		}
 	}
-	// 更改 volume 的 size
+
+	// 更改卷的大小
 	info.Opt.DriverOpts["size"] = patchSize
 	info.Opt.Name = strings.Split(name, "-")[0]
+
+	// 创建一个新的 Volume，替换旧的 Volume
 	resp, err = vs.createVolume(ctx, info)
 	if err != nil {
 		return resp, errors.WithMessage(err, "service.createVolume failed")
 	}
 
-	// 将旧的Volume 里的数据移到新的 Volume 中
-	WorkQueue <- &copyTask{
+	// 异步拷贝旧 Volume 的数据到新的 Volume
+	workQueue.Queue <- &workQueue.CopyTask{
 		Resource:    etcd.VolumePrefix,
 		OldResource: name,
 		NewResource: resp.Name,
@@ -155,44 +172,7 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 	return
 }
 
-func (vs *VolumeService) volumeMountpoint(name string) (string, error) {
-	ctx := context.Background()
-	resp, err := docker.Cli.VolumeInspect(ctx, name)
-	if err != nil || len(resp.Mountpoint) == 0 {
-		return "", errors.Wrapf(err, "docker.VolumeInspect failed, name: %s", name)
-	}
-
-	return resp.Mountpoint, nil
-}
-
-func (vs *VolumeService) copyMountpointToContainer(task *copyTask) error {
-	oldMountpoint, err := vs.volumeMountpoint(task.OldResource)
-	if err != nil {
-		return errors.WithMessage(err, "service.volumeMountpoint failed")
-	}
-	newMountpoint, err := vs.volumeMountpoint(task.NewResource)
-	if err != nil {
-		return errors.WithMessage(err, "service.volumeMountpoint failed")
-	}
-
-	if err = vs.copyMountpointFromOldVersion(oldMountpoint, newMountpoint); err != nil {
-		return errors.WithMessage(err, "service.copyMountpointFromOldVersion failed")
-	}
-
-	return nil
-}
-
-func (vs *VolumeService) copyMountpointFromOldVersion(src, dest string) error {
-	startT := time.Now()
-	command := fmt.Sprintf(cpRFPOption, src, dest)
-	if err := cmd.NewCommand(command).Execute(); err != nil {
-		return errors.Wrapf(err, "cmd.Execute failed, command: %s, src:%s, dest: %s", command, src, dest)
-	}
-	log.Infof("service.copyMountpointFromOldVersion copy mountpoint successfully, src: %s, dest: %s, time cost: %v", src, dest, time.Since(startT))
-	return nil
-}
-
-// 以 name- 为前缀的 volume 是否存在
+// 判断 Volume 是否存在
 func (vs *VolumeService) existVolume(name string) bool {
 	ctx := context.Background()
 	list, err := docker.Cli.VolumeList(ctx, volume.ListOptions{

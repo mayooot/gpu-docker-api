@@ -9,8 +9,10 @@ import (
 )
 
 const (
+	// ContainerPrefix 容器信息存储在 etcd 中的前缀，同时也用于判断 workQueue 中的 CopyTask 类型
 	ContainerPrefix = "/apis/v1/containers"
-	VolumePrefix    = "/apis/v1/volumes"
+	// VolumePrefix Volume 信息存储在 etcd 中的前缀，同时也用于判断 workQueue 中的 CopyTask 类型
+	VolumePrefix = "/apis/v1/volumes"
 )
 
 type PutKeyValue struct {

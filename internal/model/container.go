@@ -38,3 +38,7 @@ type ContainerDelete struct {
 	Force                       bool `json:"force"`
 	DelEtcdInfoAndVersionRecord bool `json:"delEtcdInfoAndVersionRecord"`
 }
+
+type ContainerCommit struct {
+	NewImageName string `json:"newImageName"`
+}

@@ -5,7 +5,6 @@ import (
 )
 
 var (
-	//defaultHost = "unix:///var/run/docker.sock"
 	Cli *client.Client
 )
 

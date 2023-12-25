@@ -1,6 +1,8 @@
 package xerrors
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+)
 
 const (
 	volumeExisted                    = "volume existed"
