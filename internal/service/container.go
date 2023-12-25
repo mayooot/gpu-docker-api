@@ -73,21 +73,10 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 	}
 
 	// 卷挂载
-	hostConfig.Mounts = make([]mount.Mount, 0, len(spec.Binds))
+	hostConfig.Binds = make([]string, 0, len(spec.Binds))
 	for i := range spec.Binds {
-		src := spec.Binds[i].Src
-		m := mount.Mount{
-			Source: src,
-			Target: spec.Binds[i].Dest,
-		}
-		if strings.HasPrefix(src, "/") {
-			// host dir
-			m.Type = mount.TypeBind
-		} else {
-			// docker volume
-			m.Type = mount.TypeVolume
-		}
-		hostConfig.Mounts = append(hostConfig.Mounts, m)
+		// Binds
+		hostConfig.Binds = append(hostConfig.Binds, fmt.Sprintf("%s:%s", spec.Binds[i].Src, spec.Binds[i].Dest))
 	}
 
 	id, containerName, err = cs.runContainer(ctx, spec.ContainerName, model.EtcdContainerInfo{
