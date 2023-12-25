@@ -45,7 +45,7 @@ func main() {
 	}
 }
 
-func (p *program) Init(env svc.Environment) error {
+func (p *program) Init(svc.Environment) error {
 	var err error
 
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
