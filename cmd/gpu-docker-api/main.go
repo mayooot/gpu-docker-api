@@ -17,7 +17,7 @@ import (
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/gpuscheduler"
-	"github.com/mayooot/gpu-docker-api/internal/service"
+	"github.com/mayooot/gpu-docker-api/internal/workQueue"
 )
 
 var (
@@ -66,7 +66,7 @@ func (p *program) Init(env svc.Environment) error {
 		return err
 	}
 
-	service.InitWorkQueue()
+	workQueue.InitWorkQueue()
 
 	if err := gpuscheduler.InitScheduler(p.cfg); err != nil {
 		return err
@@ -99,7 +99,7 @@ func (p *program) Start() error {
 		_ = r.Run(p.cfg.Port)
 	}()
 
-	go service.SyncLoop(p.ctx, &p.wg)
+	go workQueue.SyncLoop(p.ctx, &p.wg)
 
 	return nil
 }
@@ -111,7 +111,7 @@ func (p *program) Stop() error {
 	log.Info("stopping gpu-docker-api")
 	docker.CloseDockerClient()
 	etcd.CloseEtcdClient()
-	service.Close()
+	workQueue.Close()
 	gpuscheduler.Close()
 	return nil
 }
