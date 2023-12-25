@@ -1,4 +1,4 @@
-package service
+package workQueue
 
 import (
 	"context"
@@ -11,15 +11,10 @@ import (
 
 const _maxContainerCount = 110
 
-var WorkQueue chan interface{}
-
-var (
-	cs ContainerService
-	vs VolumeService
-)
+var Queue chan interface{}
 
 func InitWorkQueue() {
-	WorkQueue = make(chan interface{}, _maxContainerCount)
+	Queue = make(chan interface{}, _maxContainerCount)
 }
 
 // SyncLoop 将容器的创建信息同步到etcd，当程序收到停止信号时，已经开始的 put 任务会继续执行
@@ -27,7 +22,7 @@ func InitWorkQueue() {
 func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 	for {
 		select {
-		case v := <-WorkQueue:
+		case v := <-Queue:
 			switch v := v.(type) {
 			case etcd.PutKeyValue:
 				go func() {
@@ -35,7 +30,7 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 					defer wg.Done()
 					if err := etcd.Put(v.Resource, v.Key, v.Value); err != nil {
 						log.Error(err.Error())
-						WorkQueue <- v
+						Queue <- v
 						return
 					}
 					log.Infof("put to etcd successfully, resource %s, key: %s, value: %s", v.Resource, v.Key, *v.Value)
@@ -46,18 +41,18 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 					defer wg.Done()
 					if err := etcd.Del(v.Resource, v.Key); err != nil {
 						log.Error(err.Error())
-						WorkQueue <- v
+						Queue <- v
 						return
 					}
 					log.Infof("delete etcd key successfully, resource %s, key: %s", v.Resource, v.Key)
 				}()
-			case *copyTask:
+			case *CopyTask:
 				switch v.Resource {
 				case etcd.ContainerPrefix:
 					go func() {
 						wg.Add(1)
 						defer wg.Done()
-						if err := cs.copyMergedDirToContainer(v); err != nil {
+						if err := copyMergedDirToContainer(v); err != nil {
 							log.Error(err.Error())
 							return
 						}
@@ -67,7 +62,7 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 					go func() {
 						wg.Add(1)
 						defer wg.Done()
-						if err := vs.copyMountpointToContainer(v); err != nil {
+						if err := copyMountPointToContainer(v); err != nil {
 							log.Error(err.Error())
 							return
 						}
@@ -84,5 +79,5 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 }
 
 func Close() {
-	close(WorkQueue)
+	close(Queue)
 }
