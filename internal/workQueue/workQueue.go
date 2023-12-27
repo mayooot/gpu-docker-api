@@ -48,7 +48,7 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 				}()
 			case *CopyTask:
 				switch v.Resource {
-				case etcd.ContainerPrefix:
+				case etcd.Containers:
 					go func() {
 						wg.Add(1)
 						defer wg.Done()
@@ -58,7 +58,7 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 						}
 						log.Infof("copy merged to volume successfully, task: %+v", *v)
 					}()
-				case etcd.VolumePrefix:
+				case etcd.Volumes:
 					go func() {
 						wg.Add(1)
 						defer wg.Done()

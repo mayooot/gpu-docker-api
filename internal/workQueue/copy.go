@@ -8,6 +8,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/mayooot/gpu-docker-api/internal/docker"
+	"github.com/mayooot/gpu-docker-api/internal/etcd"
 )
 
 var (
@@ -16,7 +17,7 @@ var (
 )
 
 type CopyTask struct {
-	Resource    string
+	Resource    etcd.EtcdResource
 	OldResource string
 	NewResource string
 }
