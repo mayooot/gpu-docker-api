@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/ngaut/log"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/pkg/errors"
 	"github.com/siddontang/go/sync2"
 
@@ -24,14 +24,12 @@ import (
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/gpuscheduler"
 	"github.com/mayooot/gpu-docker-api/internal/model"
+	vmap "github.com/mayooot/gpu-docker-api/internal/version"
 	"github.com/mayooot/gpu-docker-api/internal/workQueue"
 	xerrors "github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 type ContainerService struct{}
-
-// 用于追踪容器的版本信息
-var containerVersionMap = cmap.New[sync2.AtomicInt64]()
 
 // RunGpuContainer 创建并启动一个 GPU 容器
 func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, containerName string, err error) {
@@ -115,9 +113,9 @@ func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDe
 
 	// 是否需要异步删除 etcd 中关于容器的描述和版本号记录
 	if spec.DelEtcdInfoAndVersionRecord {
-		containerVersionMap.Remove(strings.Split(name, "-")[0])
+		vmap.ContainerVersionMap.Remove(strings.Split(name, "-")[0])
 		workQueue.Queue <- etcd.DelKey{
-			Resource: etcd.ContainerPrefix,
+			Resource: etcd.Containers,
 			Key:      name,
 		}
 		log.Infof("service.DeleteContainer, container: %s will be del etcd info and version record", name)
@@ -171,13 +169,19 @@ func (cs *ContainerService) ExecuteContainer(name string, exec *model.ContainerE
 func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.ContainerGpuPatch) (id, newContainerName string, err error) {
 	// 从 etcd 中获取容器的描述
 	ctx := context.Background()
-	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
+	infoBytes, err := etcd.Get(etcd.Containers, name)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
 	}
 	var info model.EtcdContainerInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
 		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
+	}
+
+	// 只有 etcd 中的 Volume 对象的版本和要修改的 Volume 版本一致时，才能更新
+	if strconv.FormatInt(info.Version, 10) != strings.Split(name, "-")[1] {
+		return id, newContainerName, errors.Wrapf(xerrors.NewVersionNotMatchError(),
+			"container: %s, etcd version: %d, patch version: %s", name, info.Version, strings.Split(name, "-")[1])
 	}
 
 	// 获取容器的 gpu 资源
@@ -236,7 +240,7 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 
 	// 异步拷贝旧容器的系统盘到新的容器
 	workQueue.Queue <- &workQueue.CopyTask{
-		Resource:    etcd.ContainerPrefix,
+		Resource:    etcd.Containers,
 		OldResource: info.ContainerName,
 		NewResource: newContainerName,
 	}
@@ -248,9 +252,13 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 // 需要注意的是，这个方法只是会替换新容器绑定的 Volume 资源
 // 例如 foo-0 容器绑定了 volume-0 到 /root/example 目录，现在要使用的是 volume-1，那么就会将 volume-0 替换成 volume-1，然后创建新容器
 func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.ContainerVolumePatch) (id, newContainerName string, err error) {
+	if spec.OldBind.Format() == spec.NewBind.Format() {
+		return id, newContainerName, errors.Wrapf(xerrors.NewNoPatchRequiredError(), "container: %s", name)
+	}
+
 	// 从 etcd 中获取容器的描述
 	ctx := context.Background()
-	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
+	infoBytes, err := etcd.Get(etcd.Containers, name)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
 	}
@@ -260,10 +268,16 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
+	// 只有 etcd 中的 Volume 对象的版本和要修改的 Volume 版本一致时，才能更新
+	if strconv.FormatInt(info.Version, 10) != strings.Split(name, "-")[1] {
+		return id, newContainerName, errors.Wrapf(xerrors.NewVersionNotMatchError(),
+			"container: %s, etcd version: %d, patch version: %s", name, info.Version, strings.Split(name, "-")[1])
+	}
+
 	// 变更容器的绑定信息
 	for i := range info.HostConfig.Binds {
-		if info.HostConfig.Binds[i] == spec.OldVolumeName {
-			info.HostConfig.Binds[i] = spec.NewVolumeName
+		if info.HostConfig.Binds[i] == spec.OldBind.Format() {
+			info.HostConfig.Binds[i] = spec.NewBind.Format()
 			break
 		}
 	}
@@ -276,7 +290,7 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 
 	// 异步拷贝旧容器的系统盘到新的容器
 	workQueue.Queue <- &workQueue.CopyTask{
-		Resource:    etcd.ContainerPrefix,
+		Resource:    etcd.Containers,
 		OldResource: info.ContainerName,
 		NewResource: newContainerName,
 	}
@@ -334,7 +348,7 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 
 	// 停止的时候是有卡启动的
 	// 获取 etcd 中关于容器启动的描述
-	infoBytes, err := etcd.Get(etcd.ContainerPrefix, name)
+	infoBytes, err := etcd.Get(etcd.Containers, name)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
 	}
@@ -358,7 +372,7 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 	}
 	// 异步拷贝旧容器的系统盘到新的容器
 	workQueue.Queue <- &workQueue.CopyTask{
-		Resource:    etcd.ContainerPrefix,
+		Resource:    etcd.Containers,
 		OldResource: info.ContainerName,
 		NewResource: newContainerName,
 	}
@@ -372,27 +386,25 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 }
 
 // CommitContainer 提交容器为镜像，镜像名称默认为镜像的 ID
-func (cs *ContainerService) CommitContainer(name string, spec model.ContainerCommit) (id string, err error) {
+func (cs *ContainerService) CommitContainer(name string, spec model.ContainerCommit) (imageName string, err error) {
 	// 提交为镜像
 	ctx := context.Background()
 	resp, err := docker.Cli.ContainerCommit(ctx, name, types.ContainerCommitOptions{
 		Comment: fmt.Sprintf("container name %s, commit time: %s", name, time.Now().Format("2006-01-02 15:04:05")),
 	})
 	if err != nil {
-		return id, errors.WithMessage(err, "docker.ContainerRestart failed")
+		return imageName, errors.WithMessage(err, "docker.ContainerRestart failed")
 	}
 
 	// 为镜像打标签
-	imageName := resp.ID
 	if len(spec.NewImageName) != 0 {
 		imageName = spec.NewImageName
 	}
 	if err = docker.Cli.ImageTag(ctx, resp.ID, imageName); err != nil {
-		return id, errors.WithMessage(err, "docker.ImageTag failed")
+		return imageName, errors.WithMessage(err, "docker.ImageTag failed")
 	}
-	id = resp.ID
 	log.Infof("service.CommitContainer, container: %s commit successfully", name)
-	return
+	return imageName, err
 }
 
 // 真正创建容器和启动容器的方法，这个方法不区分是用来创建 GPU 容器还是普通容器，因为它只会根据入参来创建容器
@@ -402,11 +414,11 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 	// 例如调用创建容器接口，name 不应该携带 -，例如：foo-0 会报错并返回，应该是 foo
 	// 变更容器的 GPU 信息时，传递的是 bar-0，那么会被去掉版本号，name 变成 bar
 	// 所以下面代码的作用就是，判断 name 在 map 中是否存在，如果不存在，则加入到 map 中，如果存在，则版本号加 1
-	version, ok := containerVersionMap.Get(name)
+	version, ok := vmap.ContainerVersionMap.Get(name)
 	if !ok {
-		containerVersionMap.Set(name, 0)
+		vmap.ContainerVersionMap.Set(name, 0)
 	} else {
-		containerVersionMap.Set(name, sync2.AtomicInt64(version.Add(1)))
+		vmap.ContainerVersionMap.Set(name, sync2.AtomicInt64(version.Add(1)))
 	}
 
 	// 生成此次要创建的容器的名称
@@ -436,9 +448,9 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 	}
 	// 异步添加到 etcd 中
 	workQueue.Queue <- etcd.PutKeyValue{
+		Resource: etcd.Containers,
 		Key:      containerName,
 		Value:    val.Serialize(),
-		Resource: etcd.ContainerPrefix,
 	}
 	log.Infof("service.runContainer, container: %s run successfully", containerName)
 	return

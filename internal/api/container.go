@@ -174,6 +174,10 @@ func (ch *ContainerHandler) patchGpuInfo(c *gin.Context) {
 	if err != nil {
 		log.Errorf("service.PatchContainerGpuInfo failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
+		if xerrors.IsVersionNotMatchError(err) {
+			ResponseError(c, CodeVersionNotMatch)
+			return
+		}
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)
 		return
 	}
@@ -209,10 +213,14 @@ func (ch *ContainerHandler) pathVolumeInfo(c *gin.Context) {
 		log.Errorf("service.PatchContainerVolumeInfo failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
 		if xerrors.IsNoPatchRequiredError(err) {
-			ResponseError(c, CodeContainerGpuNoNeedPatch)
+			ResponseError(c, CodeContainerVolumeNoNeedPatch)
 			return
 		}
-		ResponseError(c, CodeContainerPatchGpuInfoFailed)
+		if xerrors.IsVersionNotMatchError(err) {
+			ResponseError(c, CodeVersionNotMatch)
+			return
+		}
+		ResponseError(c, CodeContainerPatchVolumeInfoFailed)
 		return
 	}
 
@@ -292,16 +300,16 @@ func (ch *ContainerHandler) commit(c *gin.Context) {
 		return
 	}
 
-	id, err := cs.CommitContainer(name, spec)
+	imageName, err := cs.CommitContainer(name, spec)
 	if err != nil {
 		log.Errorf("service.RestartContainer failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
-		ResponseError(c, CodeContainerRestartFailed)
+		ResponseError(c, CodeContainerCommitFailed)
 		return
 	}
 
 	ResponseSuccess(c, gin.H{
-		"imageID":   id,
-		"imageName": name,
+		"imageName": imageName,
+		"container": name,
 	})
 }

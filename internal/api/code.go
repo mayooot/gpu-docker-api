@@ -26,6 +26,7 @@ const (
 	CodeContainerGpuCountMustGreaterThanZero
 	CodeContainerGpuNotEnough
 	CodeContainerGpuNoNeedPatch
+	CodeContainerCommitFailed
 
 	CodeVolumeCreateFailed
 	CodeVolumeNameNotNull
@@ -39,6 +40,8 @@ const (
 	CodeVolumeNameNotBeginWithForwardSlash
 
 	CodeEtcdDeleteFailed
+
+	CodeVersionNotMatch
 )
 
 var codeMsgMap = map[ResCode]string{
@@ -66,18 +69,20 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerGpuNotEnough:                "没有足够的 GPU 资源",
 	CodeContainerGpuNoNeedPatch:              "容器 GPU 资源不需要更新，因为更新前后数量一样",
 
-	CodeVolumeCreateFailed:                 "卷创建失败",
-	CodeVolumeNameNotNull:                  "卷名不能为空",
-	CodeVolumeDeleteFailed:                 "卷删除失败",
-	CodeVolumeExisted:                      "卷已存在",
-	CodeVolumeNameMustContainVersion:       "卷名必须包含版本号",
-	CodeVolumeSizeNoNeedPatch:              "卷大小不需要更新，因为更新前后大小一样",
-	CodeVolumeSizeNotSupported:             "卷大小单位不支持，支持的单位：KB, MB, GB, TB",
-	CodeVolumeSizeUsedGreaterThanReduce:    "卷大小更新失败，因为更新后的大小小于已使用的大小",
-	CodeVolumeNameNotContainsDash:          "卷名称不能包含-",
-	CodeVolumeNameNotBeginWithForwardSlash: "卷名称不能以 / 开头",
+	CodeVolumeCreateFailed:                 "Volume 创建失败",
+	CodeVolumeNameNotNull:                  "Volume name 不能为空",
+	CodeVolumeDeleteFailed:                 "Volume 删除失败",
+	CodeVolumeExisted:                      "Volume 已存在",
+	CodeVolumeNameMustContainVersion:       "Volume 名必须包含版本号",
+	CodeVolumeSizeNoNeedPatch:              "Volume 大小不需要更新，因为更新前后大小一样",
+	CodeVolumeSizeNotSupported:             "Volume 大小单位不支持，支持的单位：KB, MB, GB, TB",
+	CodeVolumeSizeUsedGreaterThanReduce:    "Volume 大小更新失败，因为更新后的大小小于已使用的大小",
+	CodeVolumeNameNotContainsDash:          "Volume 名称不能包含-",
+	CodeVolumeNameNotBeginWithForwardSlash: "Volume 名称不能以 / 开头",
 
 	CodeEtcdDeleteFailed: "删除 etcd 中的资源失败",
+
+	CodeVersionNotMatch: "要更新的资源的版本号和存储在 ETCD 中最新的版本号不匹配",
 }
 
 func (c ResCode) Msg() string {

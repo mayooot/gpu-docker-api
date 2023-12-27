@@ -29,9 +29,9 @@ type ContainerGpuPatch struct {
 }
 
 type ContainerVolumePatch struct {
-	Type          mount.Type `json:"type"`
-	OldVolumeName string     `json:"oldVolumeName"`
-	NewVolumeName string     `json:"newVolumeName"`
+	Type    mount.Type `json:"type"`
+	OldBind *Bind      `json:"oldBind"`
+	NewBind *Bind      `json:"newBind"`
 }
 
 type ContainerDelete struct {
