@@ -17,6 +17,7 @@ import (
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/gpuscheduler"
+	"github.com/mayooot/gpu-docker-api/internal/version"
 	"github.com/mayooot/gpu-docker-api/internal/workQueue"
 )
 
@@ -28,7 +29,7 @@ var (
 	BuildTime string
 )
 
-var configFile *string = flag.StringP("config", "c", "./etc/config.toml", "config file path")
+var configFile = flag.StringP("config", "c", "./etc/config.toml", "config file path")
 
 type program struct {
 	ctx context.Context
@@ -58,17 +59,21 @@ func (p *program) Init(svc.Environment) error {
 	if err != nil {
 		return err
 	}
-	if err := docker.InitDockerClient(); err != nil {
+	if err = docker.InitDockerClient(); err != nil {
 		return err
 	}
 
-	if err := etcd.InitEtcdClient(p.cfg); err != nil {
+	if err = etcd.InitEtcdClient(p.cfg); err != nil {
 		return err
 	}
 
 	workQueue.InitWorkQueue()
 
-	if err := gpuscheduler.InitScheduler(p.cfg); err != nil {
+	if err = gpuscheduler.Init(p.cfg); err != nil {
+		return err
+	}
+
+	if err = version.Init(); err != nil {
 		return err
 	}
 
@@ -109,9 +114,11 @@ func (p *program) Stop() error {
 	p.ctx.Done()
 
 	log.Info("stopping gpu-docker-api")
-	docker.CloseDockerClient()
-	etcd.CloseEtcdClient()
+
 	workQueue.Close()
+	docker.CloseDockerClient()
 	gpuscheduler.Close()
+	version.Close()
+	etcd.CloseEtcdClient()
 	return nil
 }
