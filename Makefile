@@ -2,17 +2,18 @@ BINARY = gpu-docker-api
 GOARCH = amd64
 
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-VERSION?=?
+#VERSION=$(shell git describe --tags)
+VERSION=123
 COMMIT=$(shell git rev-parse HEAD)
 GO_VERSION=$(shell go env GOVERSION)
-BUILD_TIME=$(shell date +%Y-%m-%d-%H-%M-%S)
+BUILD_TIME=$(shell date +%FT%T%z)
 
 GITHUB_USER = mayooot
 CURRENT_DIR =$(shell pwd)
 BUILD_DIR=${CURRENT_DIR}/cmd/${BINARY}
 BIN_DIR=${CURRENT_DIR}/bin
 
-LDFLAGS = -ldflags "-X main.BRANCH=${BRANCH} -X main.VERSION=${VERSION} -X main.COMMIT=${COMMIT} -X main.GO_VERSION=${GO_VERSION} -X main.BUILD_TIME=${BUILD_TIME}"
+LDFLAGS = -ldflags "-X main.BRANCH=${BRANCH} -X main.VERSION=${VERSION} -X main.COMMIT=${COMMIT} -X main.GoVersion=${GO_VERSION} -X main.BuildTime=${BUILD_TIME}"
 
 linux:
 	cd ${BUILD_DIR}; \
