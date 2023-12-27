@@ -4,27 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/volume"
 	"github.com/ngaut/log"
-	cmap "github.com/orcaman/concurrent-map/v2"
 	"github.com/pkg/errors"
 	"github.com/siddontang/go/sync2"
 
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/model"
+	vmap "github.com/mayooot/gpu-docker-api/internal/version"
 	"github.com/mayooot/gpu-docker-api/internal/workQueue"
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 	"github.com/mayooot/gpu-docker-api/utils"
 )
 
 type VolumeService struct{}
-
-// volumeVersionMap 用于跟踪 Volume 的版本信息
-var volumeVersionMap = cmap.New[sync2.AtomicInt64]()
 
 // CreateVolume 创建一个可指定名称和大小的 Volume
 func (vs *VolumeService) CreateVolume(spec *model.VolumeCreate) (resp volume.Volume, err error) {
@@ -57,11 +55,11 @@ func (vs *VolumeService) CreateVolume(spec *model.VolumeCreate) (resp volume.Vol
 // 真正创建 Volume 的方法，参考 runContainer 方法
 func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolumeInfo) (resp volume.Volume, err error) {
 	// 获取卷的版本信息
-	version, ok := volumeVersionMap.Get(info.Opt.Name)
+	version, ok := vmap.VolumeVersionMap.Get(info.Opt.Name)
 	if !ok {
-		volumeVersionMap.Set(info.Opt.Name, 0)
+		vmap.VolumeVersionMap.Set(info.Opt.Name, 0)
 	} else {
-		volumeVersionMap.Set(info.Opt.Name, sync2.AtomicInt64(version.Add(1)))
+		vmap.VolumeVersionMap.Set(info.Opt.Name, sync2.AtomicInt64(version.Add(1)))
 	}
 
 	// 生成此次要创建的 Volume 的名称
@@ -78,9 +76,9 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 	}
 	// 异步添加到 etcd 中
 	workQueue.Queue <- etcd.PutKeyValue{
+		Resource: etcd.Volumes,
 		Key:      info.Opt.Name,
 		Value:    val.Serialize(),
-		Resource: etcd.VolumePrefix,
 	}
 	log.Infof("serivce.createVolume, volume created successfully, name: %s, opt: %+v, version: %d", resp.Name, *info.Opt, info.Version)
 	return
@@ -96,9 +94,9 @@ func (vs *VolumeService) DeleteVolume(name string, spec *model.VolumeDelete) err
 
 	// 是否需要异步删除 etcd 中关于容器的描述和版本号记录
 	if spec.DelEtcdInfoAndVersionRecord {
-		volumeVersionMap.Remove(strings.Split(name, "-")[0])
+		vmap.VolumeVersionMap.Remove(strings.Split(name, "-")[0])
 		workQueue.Queue <- etcd.DelKey{
-			Resource: etcd.VolumePrefix,
+			Resource: etcd.Volumes,
 			Key:      name,
 		}
 		log.Infof("service.DeleteVolume, volume: %s will be del etcd info and version record", name)
@@ -114,13 +112,19 @@ func (vs *VolumeService) DeleteVolume(name string, spec *model.VolumeDelete) err
 func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (resp volume.Volume, err error) {
 	// 从 etcd 中获取 Volume 的描述
 	ctx := context.Background()
-	infoBytes, err := etcd.Get(etcd.VolumePrefix, name)
+	infoBytes, err := etcd.Get(etcd.Volumes, name)
 	if err != nil {
 		return resp, errors.WithMessage(err, "etcd.Get failed")
 	}
 	var info model.EtcdVolumeInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
 		return resp, errors.WithMessage(err, "json.Unmarshal failed")
+	}
+
+	// 只有 etcd 中的 Volume 对象的版本和要修改的 Volume 版本一致时，才能更新
+	if strconv.FormatInt(info.Version, 10) != strings.Split(name, "-")[1] {
+		return resp, errors.Wrapf(xerrors.NewVersionNotMatchError(),
+			"volume: %s, etcd version: %d, patch version: %s", name, info.Version, strings.Split(name, "-")[1])
 	}
 
 	// 获取修改前的卷大小和修改后的卷大小
@@ -163,7 +167,7 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 
 	// 异步拷贝旧 Volume 的数据到新的 Volume
 	workQueue.Queue <- &workQueue.CopyTask{
-		Resource:    etcd.VolumePrefix,
+		Resource:    etcd.Volumes,
 		OldResource: name,
 		NewResource: resp.Name,
 	}

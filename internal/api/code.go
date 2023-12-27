@@ -38,6 +38,7 @@ const (
 	CodeVolumeSizeUsedGreaterThanReduce
 	CodeVolumeNameNotContainsDash
 	CodeVolumeNameNotBeginWithForwardSlash
+	CodeContainerVolumeNoNeedPatch
 
 	CodeEtcdDeleteFailed
 
@@ -68,6 +69,8 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerGpuCountMustGreaterThanZero: "容器 GPU 数量必须大于 0",
 	CodeContainerGpuNotEnough:                "没有足够的 GPU 资源",
 	CodeContainerGpuNoNeedPatch:              "容器 GPU 资源不需要更新，因为更新前后数量一样",
+	CodeContainerVolumeNoNeedPatch:           "容器 Volume 挂载不需要更新，因为更新前后挂载一样",
+	CodeContainerCommitFailed:                "容器提交为镜像失败",
 
 	CodeVolumeCreateFailed:                 "Volume 创建失败",
 	CodeVolumeNameNotNull:                  "Volume name 不能为空",

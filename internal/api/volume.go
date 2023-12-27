@@ -133,6 +133,10 @@ func (vh *VolumeHandler) patchSize(c *gin.Context) {
 			ResponseError(c, CodeVolumeSizeNoNeedPatch)
 			return
 		}
+		if xerrors.IsVersionNotMatchError(err) {
+			ResponseError(c, CodeVersionNotMatch)
+			return
+		}
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)
 		return
 	}
