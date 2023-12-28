@@ -664,7 +664,7 @@ Param：`dilute-0`
 
 ~~~json
 {
-    "cmd": ["nvcc --version"]
+    "cmd": ["nvidia-smi"]
 }
 ~~~
 
@@ -674,7 +674,9 @@ Param：`dilute-0`
 {
     "code": 200,
     "msg": "success",
-    "data": "Wed Dec 27 09:11:22 2023       \n+-----------------------------------------------------------------------------+\n| NVIDIA-SMI 525.85.12    Driver Version: 525.85.12    CUDA Version: 12.0     |\n|-------------------------------+----------------------+----------------------+\n| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |\n|                               |                      |               MIG M. |\n|===============================+======================+======================|\n|   0  NVIDIA A100 80G...  On   | 00000000:39:00.0 Off |                    0 |\n| N/A   39C    P0    47W / 300W |      0MiB / 81920MiB |      0%      Default |\n|                               |                      |             Disabled |\n+-------------------------------+----------------------+----------------------+\n                                                                               \n+-----------------------------------------------------------------------------+\n| Processes:                                                                  |\n|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |\n|        ID   ID                                                   Usage      |\n|=============================================================================|\n|  No running processes found                                                 |\n+-----------------------------------------------------------------------------+\n"
+    "data": {
+        "stdout": "Wed Dec 27 09:11:22 2023       \n+-----------------------------------------------------------------------------+\n| NVIDIA-SMI 525.85.12    Driver Version: 525.85.12    CUDA Version: 12.0     |\n|-------------------------------+----------------------+----------------------+\n| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |\n|                               |                      |               MIG M. |\n|===============================+======================+======================|\n|   0  NVIDIA A100 80G...  On   | 00000000:39:00.0 Off |                    0 |\n| N/A   39C    P0    47W / 300W |      0MiB / 81920MiB |      0%      Default |\n|                               |                      |             Disabled |\n+-------------------------------+----------------------+----------------------+\n                                                                               \n+-----------------------------------------------------------------------------+\n| Processes:                                                                  |\n|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |\n|        ID   ID                                                   Usage      |\n|=============================================================================|\n|  No running processes found                                                 |\n+-----------------------------------------------------------------------------+\n"
+    }
 }
 ~~~
 
@@ -683,6 +685,8 @@ Param：`dilute-0`
 ## GPU
 
 ### 查看 GPU 使用情况
+
+描述：key：GPU UUID  value：占用情况，0 代表未被占用，1 代表已被占用
 
 请求方法：`GET`
 
@@ -695,14 +699,16 @@ Param：`dilute-0`
     "code": 200,
     "msg": "success",
     "data": {
-        "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31": 1,
-        "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68": 1,
-        "GPU-36009026-9470-a2e0-73d3-222a63b82e4e": 1,
-        "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d": 0,
-        "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5": 0,
-        "GPU-bc85a406-0357-185f-a56c-afb49572bdbe": 1,
-        "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce": 1,
-        "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9": 1
+        "gpuStatus": {
+            "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31": 0,
+            "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68": 0,
+            "GPU-36009026-9470-a2e0-73d3-222a63b82e4e": 0,
+            "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d": 0,
+            "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5": 0,
+            "GPU-bc85a406-0357-185f-a56c-afb49572bdbe": 0,
+            "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce": 0,
+            "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9": 0
+        }
     }
 }
 ~~~

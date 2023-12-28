@@ -2,7 +2,7 @@
   "openapi": "3.0.1",
   "info": {
     "title": "gpu-docker-api",
-    "description": "",
+    "description": "https://github.com/mayooot/gpu-docker-api",
     "version": "1.0.0"
   },
   "tags": [
@@ -11,55 +11,19 @@
     },
     {
       "name": "卷"
+    },
+    {
+      "name": "GPU"
     }
   ],
   "paths": {
     "/api/v1/containers": {
       "post": {
-        "summary": "创建GPU容器",
+        "summary": "提交容器为镜像",
         "x-apifox-folder": "容器",
         "x-apifox-status": "released",
         "deprecated": false,
-        "description": "",
-        "tags": [
-          "容器"
-        ],
-        "parameters": [],
-        "requestBody": {
-          "content": {
-            "text/plain": {
-              "schema": {
-                "type": "string"
-              },
-              "example": "{\n    \"imageName\": \"nvidia/cuda:10.0-base\",\n    \"gpuNumbers\": [],\n    \"cardless\": false,\n    \"binds\": [\n        {\n            \"src\": \"/usr/local/bar\",\n            \"dest\": \"/usr/local/bar\"\n        },\n        {\n            \"src\": \"foo\",\n            \"dest\": \"/root/foo\"\n        }\n    ]\n}"
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {},
-                  "x-apifox-orders": [],
-                  "x-apifox-ignore-properties": []
-                }
-              }
-            }
-          }
-        },
-        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130898951-run"
-      }
-    },
-    "/api/v1/containers/07343ac75f10f15e167f21b9ef03f27cef24cdc61f1798b6d2696cfab34d4a48/execute": {
-      "post": {
-        "summary": "exec",
-        "x-apifox-folder": "容器",
-        "x-apifox-status": "released",
-        "deprecated": false,
-        "description": "",
+        "description": "### 提交容器为镜像\n\n描述：镜像名称默认为容器 ID。",
         "tags": [
           "容器"
         ],
@@ -70,11 +34,509 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "newImageName": {
+                    "type": "string",
+                    "description": "导出的镜像名称"
+                  }
+                },
+                "required": [
+                  "newImageName"
+                ],
+                "x-apifox-orders": [
+                  "newImageName"
+                ],
+                "x-apifox-ignore-properties": []
+              },
+              "example": {
+                "newImageName": "advocate-0-12-27"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "container": {
+                          "type": "string",
+                          "description": "进行 commit 操作的容器名称"
+                        },
+                        "imageName": {
+                          "type": "string",
+                          "description": "生成的镜像名称"
+                        }
+                      },
+                      "required": [
+                        "container",
+                        "imageName"
+                      ],
+                      "x-apifox-orders": [
+                        "container",
+                        "imageName"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "container": "advocate-0",
+                        "imageName": "advocate-0-12-27"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326931-run"
+      }
+    },
+    "/api/v1/containers/{name}/gpu": {
+      "patch": {
+        "summary": "更改 GPU 配置",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "### 更改容器的 GPU 配置\n\n> 1. 如果调用接口前后，容器的 GPU 数量不变，那么会直接跳过。比如有卡容器使用了 3 张卡，调用接口时传递的 gpuCount 仍然为 3。无卡容器的 gpuCount 为 0，调用接口时传递的 gpuCount 仍然为 0。\n> 2. 升降 GPU 配置时，会重新创建一个容器，比如 foo-0 容器的 gpuCount 为 3，升级到 5 张卡，新的容器名称为 foo-1。此时不能再对 foo-0 进行更改 GPU/更改 Volume 的操作，因为最新版本是 foo-0。\n> 3. 可以将无卡容器变为有卡容器，也可将有卡容器转为无卡容器，当然也可以升降有卡容器的 GPU 卡数。",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "要修改的容器的名称",
+            "required": true,
+            "example": "knockGpu-0",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "gpuCount": {
+                    "type": "integer",
+                    "description": "要使用的GPU 数量"
+                  }
+                },
+                "required": [
+                  "gpuCount"
+                ],
+                "x-apifox-orders": [
+                  "gpuCount"
+                ],
+                "x-apifox-ignore-properties": []
+              },
+              "example": {
+                "gpuCount": 5
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "新创建的容器 ID"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "新创建的容器名称"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "x-apifox-orders": [
+                        "id",
+                        "name"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "id": "f14e23c3b76bb25f67969ac5736f679c2aa09e7c90dd9d64d30629dd0b59c71d",
+                        "name": "knockGpu-1"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326932-run"
+      }
+    },
+    "/api/v1/containers/{name}/stop": {
+      "patch": {
+        "summary": "重启动容器",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "### 重启容器\n\n描述：停止的无卡容器重启时，直接 docker restart。\n\n停止的有卡容器重启时，会重新为它创建一个新容器，同时重新申请它之前使用的指定数量的 GPU（使用的卡号可能发生变化，例如之前使用0、 1、 2 号卡，新容器可能使用 3、 4、 5 号卡）。\n\n⚠️**不用担心的是，它和之前的容器一模一样，只是看起来容器名称有些变化。**",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "需要重启的容器名称",
+            "required": true,
+            "example": "sarcastic-0",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "有卡容器“重启”后新创建的容器 ID"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "有卡容器“重启”后新创建的容器名称"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "x-apifox-orders": [
+                        "id",
+                        "name"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "id": "cc19da17f809b19e05f5baf85b873248d70de0903f390e85fb08cbc1cda29000",
+                        "name": "sarcastic-1"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326934-run"
+      }
+    },
+    "/api/v1/containers/{name}/volume": {
+      "patch": {
+        "summary": "更改 Volume 配置",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "### 更改容器的 Volume 配置\n\n> 1. 变更的挂载信息必须为 Docker Volume 类型的卷，因为非 Docker Volume 类型的挂载，例如 NFS 目录挂载到容器内部，扩容/缩容、数据的销毁不是由 Docker 管理的。\n>\n> 2. 如果传递的 oldBind 和 newBind 相同，会直接跳过。\n>\n> 3. 这里的处理方式和`更改容器的 GPU 配置`不同，具体在`更改前后资源没有发生变化`这一情况。\n>\n>    更改 GPU 时，如果更改前后卡的数量一样，就跳过。\n>\n>    而对于 Volume 来说，判断`更改前后容量是否发生变化`，处理逻辑在 `更改 Volume 大小`的接口。\n>\n>    所以使用该接口时，传递的应该是扩容/缩容好的 Volume（或者一张新的 Volume，不过没测试过这种情况是否可用😢）。",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "要修改的容器名称",
+            "required": true,
+            "example": "marital-0",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "卷的类型，目前只支持 volume，也就是 docker volume create的卷"
+                  },
+                  "oldBind": {
+                    "type": "object",
+                    "properties": {
+                      "src": {
+                        "type": "string",
+                        "description": "旧的 volume 名称"
+                      },
+                      "dest": {
+                        "type": "string",
+                        "description": "旧的容器内的挂载地址"
+                      }
+                    },
+                    "required": [
+                      "src",
+                      "dest"
+                    ],
+                    "x-apifox-orders": [
+                      "src",
+                      "dest"
+                    ],
+                    "description": "容器目前使用的卷绑定信息",
+                    "x-apifox-ignore-properties": []
+                  },
+                  "newBind": {
+                    "type": "object",
+                    "properties": {
+                      "src": {
+                        "type": "string",
+                        "description": "新的 volume 名称"
+                      },
+                      "dest": {
+                        "type": "string",
+                        "description": "新的容器内的挂载地址"
+                      }
+                    },
+                    "required": [
+                      "src",
+                      "dest"
+                    ],
+                    "x-apifox-orders": [
+                      "src",
+                      "dest"
+                    ],
+                    "description": "容器将要使用的卷绑定信息",
+                    "x-apifox-ignore-properties": []
+                  }
+                },
+                "required": [
+                  "type",
+                  "oldBind",
+                  "newBind"
+                ],
+                "x-apifox-orders": [
+                  "type",
+                  "oldBind",
+                  "newBind"
+                ],
+                "x-apifox-ignore-properties": []
+              },
+              "example": {
+                "type": "volume",
+                "oldBind": {
+                  "src": "aerialVol-0",
+                  "dest": "/root/aerialVol"
+                },
+                "newBind": {
+                  "src": "aerialVol-1",
+                  "dest": "/root/aerialVol"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "新容器的 ID"
+                        },
+                        "name": {
+                          "type": "string",
+                          "description": "新容器的名称"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "x-apifox-orders": [
+                        "id",
+                        "name"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "id": "671eacb8514c92fa62e296785c1164b0a70f4c5fc28b525a210f870acef94e2b",
+                        "name": "marital-1"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326935-run"
+      }
+    },
+    "/api/v1/containers/{name}/execute": {
+      "post": {
+        "summary": "执行命令",
+        "x-apifox-folder": "容器",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "### 容器内执行命令\n\n描述：相当于 docker exec，但是不能向在宿主机一样进入容器，只能将标准输出返回，当你传递一些命令给容器时。",
+        "tags": [
+          "容器"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "要执行命令的容器名称",
+            "required": true,
+            "example": "dilute-0",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
                   "cmd": {
                     "type": "array",
                     "items": {
                       "type": "string"
-                    }
+                    },
+                    "description": "容器中要执行的命令"
                   }
                 },
                 "required": [
@@ -100,28 +562,115 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {},
-                  "x-apifox-orders": [],
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "stdout": {
+                          "type": "string",
+                          "description": "命令的标准输出"
+                        }
+                      },
+                      "required": [
+                        "stdout"
+                      ],
+                      "x-apifox-orders": [
+                        "stdout"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
                   "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "stdout": "Wed Dec 27 09:11:22 2023       \n+-----------------------------------------------------------------------------+\n| NVIDIA-SMI 525.85.12    Driver Version: 525.85.12    CUDA Version: 12.0     |\n|-------------------------------+----------------------+----------------------+\n| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |\n| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |\n|                               |                      |               MIG M. |\n|===============================+======================+======================|\n|   0  NVIDIA A100 80G...  On   | 00000000:39:00.0 Off |                    0 |\n| N/A   39C    P0    47W / 300W |      0MiB / 81920MiB |      0%      Default |\n|                               |                      |             Disabled |\n+-------------------------------+----------------------+----------------------+\n                                                                               \n+-----------------------------------------------------------------------------+\n| Processes:                                                                  |\n|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |\n|        ID   ID                                                   Usage      |\n|=============================================================================|\n|  No running processes found                                                 |\n+-----------------------------------------------------------------------------+\n"
+                      }
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130898952-run"
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326936-run"
       }
     },
-    "/api/v1/containers/b740d94d09a2370c80f1b9043a64ce5d14a4e096f47d9813a20192fa1169e4bb": {
+    "/api/v1/containers/{name}": {
       "delete": {
         "summary": "删除容器",
         "x-apifox-folder": "容器",
         "x-apifox-status": "released",
         "deprecated": false,
-        "description": "",
+        "description": "### 删除容器\n\n描述：删除有卡容器时，会释放它所占用的 GPU 资源，如果指定了 delEtcdInfoAndVersionRecord 参数为 true，那么删除容器时也会删除掉 ETCD 和 VersionMap 中关于它的记录。\n\n通过一个具体的例子来解释，比如当前有一个 foo-0 容器，它经过一次升级 GPU 配置，变成了 foo-1。\n\n此时，要删除 foo-1，如果指定了 delEtcdInfoAndVersionRecord 为 true，那么 ETCD 中关于 foo 的描述会被删除，以为记录版本的 Map 中会移除 foo。就好像 foo-0、foo-1 从来没有来过。\n\n当然 foo-0 还没有被删除，当你把 foo-0 删除时，你就可以再次用 foo 作为名字创建容器，新的描述会被添加到 ETCD，然后 {k: foo, v: 0} 会被添加到 VersionMap 中。\n\n如果 delEtcdInfoAndVersionRecord为 false，我们删除了 foo-1，此时我们仍然可以在 foo-1 的基础上继续变更配置，生成一个 foo-2。这适用于释放资源。\n\n所以，如果要单纯的释放资源，delEtcdInfoAndVersionRecord 应为 false。如果确定这个要抹除掉一个容器的历史版本，应为 true。\n\n<!--TODO：其实可以只传入 foo，如果delEtcdInfoAndVersionRecord为 true，那么就删除 ETCD、VersionMap 中的数据，然后依次删除 foo-0、foo-1... foo-n。然后没有单独的删除容器，可能比较好。🤔-->",
         "tags": [
           "容器"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "需要删除的容器名称",
+            "required": true,
+            "example": "sarcastic-0",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "force": {
+                    "type": "boolean",
+                    "description": "是否强制删除"
+                  },
+                  "delEtcdInfoAndVersionRecord": {
+                    "type": "boolean",
+                    "description": "是否删除 ETCD 和 VersionMap 中的容器信息"
+                  }
+                },
+                "required": [
+                  "force",
+                  "delEtcdInfoAndVersionRecord"
+                ],
+                "x-apifox-orders": [
+                  "force",
+                  "delEtcdInfoAndVersionRecord"
+                ],
+                "x-apifox-ignore-properties": []
+              },
+              "example": {
+                "force": true,
+                "delEtcdInfoAndVersionRecord": true
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success",
@@ -129,15 +678,173 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {},
-                  "x-apifox-orders": [],
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
                   "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": null
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130898953-run"
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326937-run"
+      }
+    },
+    "/api/v1/gpus": {
+      "get": {
+        "summary": "查看GPU使用状态",
+        "x-apifox-folder": "GPU",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "### 查看 GPU 使用情况\n\n描述：key：GPU UUID  value：占用情况，0 代表未被占用，1 代表已被占用",
+        "tags": [
+          "GPU"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "gpuStatus": {
+                          "type": "object",
+                          "properties": {
+                            "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31": {
+                              "type": "integer"
+                            },
+                            "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68": {
+                              "type": "integer"
+                            },
+                            "GPU-36009026-9470-a2e0-73d3-222a63b82e4e": {
+                              "type": "integer"
+                            },
+                            "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d": {
+                              "type": "integer"
+                            },
+                            "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5": {
+                              "type": "integer"
+                            },
+                            "GPU-bc85a406-0357-185f-a56c-afb49572bdbe": {
+                              "type": "integer"
+                            },
+                            "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce": {
+                              "type": "integer"
+                            },
+                            "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31",
+                            "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68",
+                            "GPU-36009026-9470-a2e0-73d3-222a63b82e4e",
+                            "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d",
+                            "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5",
+                            "GPU-bc85a406-0357-185f-a56c-afb49572bdbe",
+                            "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce",
+                            "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9"
+                          ],
+                          "x-apifox-orders": [
+                            "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31",
+                            "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68",
+                            "GPU-36009026-9470-a2e0-73d3-222a63b82e4e",
+                            "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d",
+                            "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5",
+                            "GPU-bc85a406-0357-185f-a56c-afb49572bdbe",
+                            "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce",
+                            "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9"
+                          ],
+                          "description": "GPU 使用情况",
+                          "x-apifox-ignore-properties": []
+                        }
+                      },
+                      "required": [
+                        "gpuStatus"
+                      ],
+                      "x-apifox-orders": [
+                        "gpuStatus"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "gpuStatus": {
+                          "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31": 0,
+                          "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68": 0,
+                          "GPU-36009026-9470-a2e0-73d3-222a63b82e4e": 0,
+                          "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d": 0,
+                          "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5": 0,
+                          "GPU-bc85a406-0357-185f-a56c-afb49572bdbe": 0,
+                          "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce": 0,
+                          "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326938-run"
       }
     },
     "/api/v1/volumes": {
@@ -146,11 +853,43 @@
         "x-apifox-folder": "卷",
         "x-apifox-status": "released",
         "deprecated": false,
-        "description": "",
+        "description": "### 创建指定大小的 Volume\n\n描述：大小支持的单位有：KB, MB, GB, TB（不区分大小写）",
         "tags": [
           "卷"
         ],
         "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Volume 名称"
+                  },
+                  "size": {
+                    "type": "string",
+                    "description": "容量大小"
+                  }
+                },
+                "required": [
+                  "name",
+                  "size"
+                ],
+                "x-apifox-orders": [
+                  "name",
+                  "size"
+                ],
+                "x-apifox-ignore-properties": []
+              },
+              "example": {
+                "name": "rubVol",
+                "size": "20GB"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Success",
@@ -158,18 +897,69 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {},
-                  "x-apifox-orders": [],
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "创建出来的 Volume 名称"
+                        },
+                        "size": {
+                          "type": "string",
+                          "description": "创建出来的 Volume 容量大小"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "size"
+                      ],
+                      "x-apifox-orders": [
+                        "name",
+                        "size"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
                   "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "name": "rubVol-0",
+                        "size": "20GB"
+                      }
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130898954-run"
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326940-run"
       }
     },
-    "/api/v1/volumes/foo": {
+    "/api/v1/volumes/{name}": {
       "delete": {
         "summary": "删除卷",
         "x-apifox-folder": "卷",
@@ -179,36 +969,18 @@
         "tags": [
           "卷"
         ],
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {},
-                  "x-apifox-orders": [],
-                  "x-apifox-ignore-properties": []
-                }
-              }
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "要删除的 Volume 名称",
+            "required": true,
+            "example": "rubVol-2",
+            "schema": {
+              "type": "string"
             }
           }
-        },
-        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-130958812-run"
-      }
-    },
-    "/api/v1/containers/bar/dick": {
-      "put": {
-        "summary": "容器重命名",
-        "x-apifox-folder": "容器",
-        "x-apifox-status": "released",
-        "deprecated": false,
-        "description": "",
-        "tags": [
-          "容器"
         ],
-        "parameters": [],
         "responses": {
           "200": {
             "description": "Success",
@@ -216,54 +988,160 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {},
-                  "x-apifox-orders": [],
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "null"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
                   "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": null
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-131334394-run"
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326941-run"
       }
     },
-    "/api/v1/containers/foo-0/gpu": {
+    "/api/v1/volumes/{name}/size": {
       "patch": {
-        "summary": "更改 GPU 配置",
-        "x-apifox-folder": "容器",
+        "summary": "更改卷大小",
+        "x-apifox-folder": "卷",
         "x-apifox-status": "released",
         "deprecated": false,
-        "description": "",
+        "description": "### 更改 Volume 的大小\n\n> 1. 无论扩容/缩容，如果操作前后大小不变，那么就会跳过。\n>\n>    例如当前 Volume 大小为 20GB，扩容/缩容后还是20GB。\n>\n> 2. 更改大小时，会重新创建一个 Volume，比如 foo-0 的大小为 10GB，扩容成 20GB，新的 Volume 名称为 foo-1。此时不能再对 foo-0 进行更改 Volume 操作，因为最新的版本是 foo-1。\n",
         "tags": [
-          "容器"
+          "卷"
         ],
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "要修改的 Volume 名称",
+            "required": true,
+            "example": "rubVol-0",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
-            "text/plain": {
+            "application/json": {
               "schema": {
-                "type": "string"
+                "type": "object",
+                "properties": {
+                  "size": {
+                    "type": "string",
+                    "description": "修改后的 Volume 容量大小"
+                  }
+                },
+                "required": [
+                  "size"
+                ],
+                "x-apifox-orders": [
+                  "size"
+                ],
+                "x-apifox-ignore-properties": []
               },
-              "example": "{\n    \"imageName\": \"nvidia/cuda:10.0-base\",\n    \"gpuNumbers\": [],\n    \"cardless\": false,\n    \"binds\": [\n        {\n            \"src\": \"/usr/local/bar\",\n            \"dest\": \"/usr/local/bar\"\n        },\n        {\n            \"src\": \"foo\",\n            \"dest\": \"/root/foo\"\n        }\n    ]\n}"
+              "example": {
+                "size": "50GB"
+              }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "Success",
+            "description": "OK",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": {},
-                  "x-apifox-orders": [],
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "description": "新创建的 Volume 名称"
+                        },
+                        "size": {
+                          "type": "string",
+                          "description": "新创建的 Volume 容量大小"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "size"
+                      ],
+                      "x-apifox-orders": [
+                        "name",
+                        "size"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
                   "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "name": "rubVol-1",
+                        "size": "50GB"
+                      }
+                    }
+                  }
                 }
               }
             }
           }
         },
-        "x-run-in-apifox": "https://apifox.com/web/project/3699799/apis/api-131511375-run"
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326942-run"
       }
     }
   },
