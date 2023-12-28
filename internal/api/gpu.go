@@ -14,5 +14,7 @@ func (gh *GpuHandler) RegisterRoute(g *gin.RouterGroup) {
 
 func (gh *GpuHandler) getGpu(c *gin.Context) {
 	gpus := gpuscheduler.Scheduler.GetGpuStatus()
-	ResponseSuccess(c, gpus)
+	ResponseSuccess(c, gin.H{
+		"gpuStatus": gpus,
+	})
 }

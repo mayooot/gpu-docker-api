@@ -147,7 +147,9 @@ func (ch *ContainerHandler) execute(c *gin.Context) {
 		return
 	}
 
-	ResponseSuccess(c, resp)
+	ResponseSuccess(c, gin.H{
+		"stdout": resp,
+	})
 }
 
 func (ch *ContainerHandler) patchGpuInfo(c *gin.Context) {
