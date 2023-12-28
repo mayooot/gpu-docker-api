@@ -2,8 +2,7 @@ BINARY = gpu-docker-api
 GOARCH = amd64
 
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
-#VERSION=$(shell git describe --tags)
-VERSION=123
+VERSION=$(shell git describe --tags)
 COMMIT=$(shell git rev-parse HEAD)
 GO_VERSION=$(shell go env GOVERSION)
 BUILD_TIME=$(shell date +%FT%T%z)
@@ -14,6 +13,8 @@ BUILD_DIR=${CURRENT_DIR}/cmd/${BINARY}
 BIN_DIR=${CURRENT_DIR}/bin
 
 LDFLAGS = -ldflags "-X main.BRANCH=${BRANCH} -X main.VERSION=${VERSION} -X main.COMMIT=${COMMIT} -X main.GoVersion=${GO_VERSION} -X main.BuildTime=${BUILD_TIME}"
+
+all: fmt imports clean linux darwin windows
 
 linux:
 	cd ${BUILD_DIR}; \
@@ -39,4 +40,4 @@ fmt:
 imports:
 	goimports-reviser --rm-unused -local github.com/${GITHUB_USER}/${BINARY} -format ./...
 
-.PHONY: linux darwin windows clean fmt imports
+.PHONY: all linux darwin windows clean fmt imports
