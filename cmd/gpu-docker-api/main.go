@@ -110,8 +110,8 @@ func (p *program) Start() error {
 }
 
 func (p *program) Stop() error {
-	p.wg.Wait()
 	p.ctx.Done()
+	p.wg.Wait()
 
 	log.Info("stopping gpu-docker-api")
 

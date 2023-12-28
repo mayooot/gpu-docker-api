@@ -25,8 +25,8 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 		case v := <-Queue:
 			switch v := v.(type) {
 			case etcd.PutKeyValue:
+				wg.Add(1)
 				go func() {
-					wg.Add(1)
 					defer wg.Done()
 					if err := etcd.Put(v.Resource, v.Key, v.Value); err != nil {
 						log.Error(err.Error())
@@ -36,8 +36,8 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 					log.Infof("put to etcd successfully, resource %s, key: %s, value: %s", v.Resource, v.Key, *v.Value)
 				}()
 			case etcd.DelKey:
+				wg.Add(1)
 				go func() {
-					wg.Add(1)
 					defer wg.Done()
 					if err := etcd.Del(v.Resource, v.Key); err != nil {
 						log.Error(err.Error())
@@ -49,8 +49,8 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 			case *CopyTask:
 				switch v.Resource {
 				case etcd.Containers:
+					wg.Add(1)
 					go func() {
-						wg.Add(1)
 						defer wg.Done()
 						if err := copyMergedDirToContainer(v); err != nil {
 							log.Error(err.Error())
@@ -59,8 +59,8 @@ func SyncLoop(ctx context.Context, wg *sync.WaitGroup) {
 						log.Infof("copy merged to volume successfully, task: %+v", *v)
 					}()
 				case etcd.Volumes:
+					wg.Add(1)
 					go func() {
-						wg.Add(1)
 						defer wg.Done()
 						if err := copyMountPointToContainer(v); err != nil {
 							log.Error(err.Error())
