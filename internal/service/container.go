@@ -26,7 +26,7 @@ import (
 	"github.com/mayooot/gpu-docker-api/internal/model"
 	vmap "github.com/mayooot/gpu-docker-api/internal/version"
 	"github.com/mayooot/gpu-docker-api/internal/workQueue"
-	xerrors "github.com/mayooot/gpu-docker-api/internal/xerrors"
+	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 type ContainerService struct{}

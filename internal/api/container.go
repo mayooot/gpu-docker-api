@@ -9,7 +9,7 @@ import (
 
 	"github.com/mayooot/gpu-docker-api/internal/model"
 	"github.com/mayooot/gpu-docker-api/internal/service"
-	xerrors "github.com/mayooot/gpu-docker-api/internal/xerrors"
+	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 type ContainerHandler struct{}
