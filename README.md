@@ -155,8 +155,8 @@ vim etc/config.yaml
 
 ### 文档
 
-* 容器升降 GPU 资源的实现: [doc](./docs/container/container-gpu-scale.md)
-* Volume 扩缩容的实现: [doc](./docs/volume/volume-size-scale.md)
+* 容器升降 GPU 资源的实现: [container-gpu-scale.md](docs%2Fcontainer%2Fcontainer-gpu-scale.md)
+* Volume 扩缩容的实现: [volume-size-scale.md](docs%2Fvolume%2Fvolume-size-scale.md)
 
 ## 贡献代码
 
