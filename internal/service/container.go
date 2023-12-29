@@ -57,10 +57,10 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 
 	// 绑定端口映射
 	hostConfig.PortBindings = make(nat.PortMap, len(spec.Ports))
+	config.ExposedPorts = make(nat.PortSet, len(spec.Ports))
 	for _, port := range spec.Ports {
-		hostConfig.PortBindings[nat.Port(fmt.Sprintf("%d/tcp", port.ContainerPort))] = []nat.PortBinding{{
-			HostPort: fmt.Sprintf("%d", port.HostPort),
-		}}
+		hostConfig.PortBindings[port.Key()] = port.Value()
+		config.ExposedPorts[port.Key()] = struct{}{}
 	}
 
 	// 绑定 GPU 资源信息

@@ -1,7 +1,9 @@
 package model
 
 import (
+	"fmt"
 	"github.com/docker/docker/api/types/mount"
+	"github.com/docker/go-connections/nat"
 )
 
 type ContainerRun struct {
@@ -17,6 +19,16 @@ type ContainerRun struct {
 type Ports struct {
 	HostPort      uint16 `json:"hostPort"`
 	ContainerPort uint16 `json:"containerPort"`
+}
+
+func (p Ports) Key() nat.Port {
+	return nat.Port(fmt.Sprintf("%d/tcp", p.ContainerPort))
+}
+
+func (p Ports) Value() []nat.PortBinding {
+	return []nat.PortBinding{{
+		HostPort: fmt.Sprintf("%d", p.HostPort),
+	}}
 }
 
 type ContainerExecute struct {
