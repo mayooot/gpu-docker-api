@@ -16,6 +16,8 @@ LDFLAGS = -ldflags "-X main.BRANCH=${BRANCH} -X main.VERSION=${VERSION} -X main.
 
 all: fmt imports clean linux darwin windows
 
+build: clean linux darwin windows
+
 linux:
 	cd ${BUILD_DIR}; \
 	GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${BIN_DIR}/${BINARY}-linux-${GOARCH} . ; \
@@ -40,4 +42,4 @@ fmt:
 imports:
 	goimports-reviser --rm-unused -local github.com/${GITHUB_USER}/${BINARY} -format ./...
 
-.PHONY: all linux darwin windows clean fmt imports
+.PHONY: all build linux darwin windows clean fmt imports
