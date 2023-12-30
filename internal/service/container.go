@@ -22,8 +22,9 @@ import (
 
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
-	"github.com/mayooot/gpu-docker-api/internal/gpuscheduler"
 	"github.com/mayooot/gpu-docker-api/internal/model"
+	"github.com/mayooot/gpu-docker-api/internal/scheduler/gpuscheduler"
+	"github.com/mayooot/gpu-docker-api/internal/scheduler/portscheduler"
 	vmap "github.com/mayooot/gpu-docker-api/internal/version"
 	"github.com/mayooot/gpu-docker-api/internal/workQueue"
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
@@ -55,12 +56,14 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 		Tty:       true,
 	}
 
-	// 绑定端口映射
-	hostConfig.PortBindings = make(nat.PortMap, len(spec.Ports))
-	config.ExposedPorts = make(nat.PortSet, len(spec.Ports))
-	for _, port := range spec.Ports {
-		hostConfig.PortBindings[port.Key()] = port.Value()
-		config.ExposedPorts[port.Key()] = struct{}{}
+	// 只想容器要暴露的端口，添加到创建容器的信息中
+	// 具体这个端口要映射到宿主机的哪个端口，交给 runContainer 方法
+	// 这样做的好处就是，不管是创建容器、变更容器 GPU/Volume、重启动容器，都无需关心端口的配置
+	hostConfig.PortBindings = make(nat.PortMap, len(spec.ContainerPorts))
+	config.ExposedPorts = make(nat.PortSet, len(spec.ContainerPorts))
+	for _, port := range spec.ContainerPorts {
+		config.ExposedPorts[nat.Port(port+"/tcp")] = struct{}{}
+		hostConfig.PortBindings[nat.Port(port+"/tcp")] = nil
 	}
 
 	// 绑定 GPU 资源信息
@@ -94,7 +97,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 	return
 }
 
-// DeleteContainer 删除一个容器，如果是 GPU 容器，会归还使用的 GPU 资源
+// DeleteContainer 删除一个容器，归还端口资源，如果是 GPU 容器，会归还使用的 GPU 资源
 // 根据入参选择是否要删除 etcd 中关于容器的描述，以及版本号记录
 func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDelete) error {
 	var err error
@@ -104,6 +107,13 @@ func (cs *ContainerService) DeleteContainer(name string, spec *model.ContainerDe
 		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
 	}
 	gpuscheduler.Scheduler.RestoreGpus(uuids)
+
+	// 归还端口资源
+	ports, err := cs.containerPortBindings(name)
+	if err != nil {
+		return errors.WithMessage(err, "service.containerPortBindings failed")
+	}
+	portscheduler.Scheduler.RestorePorts(ports)
 
 	// 删除容器
 	ctx := context.Background()
@@ -299,7 +309,7 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 	return
 }
 
-// StopContainer 停止容器，如果是 GPU 容器，会归还使用的资源
+// StopContainer 停止容器，会归还端口资源，如果是 GPU 容器，会归还使用的资源
 func (cs *ContainerService) StopContainer(name string) error {
 	// 归还 gpu 资源
 	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
@@ -309,6 +319,13 @@ func (cs *ContainerService) StopContainer(name string) error {
 	gpuscheduler.Scheduler.RestoreGpus(uuids)
 	log.Infof("service.StopContainer, container: %s restore %d gpus, uuids: %+v",
 		name, len(uuids), uuids)
+
+	// 归还端口资源
+	ports, err := cs.containerPortBindings(name)
+	if err != nil {
+		return errors.WithMessage(err, "service.containerPortBindings failed")
+	}
+	portscheduler.Scheduler.RestorePorts(ports)
 
 	// 停止容器
 	ctx := context.Background()
@@ -328,7 +345,6 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
 	if err != nil {
 		return id, newContainerName, errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
-
 	}
 	if len(uuids) == 0 {
 		// 停止的时候是无卡启动的，直接使用 docker restart 重启
@@ -429,6 +445,19 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 
 	// 生成此次要创建的容器的名称
 	containerName = fmt.Sprintf("%s-%d", name, version)
+
+	availableOSPorts, err := portscheduler.Scheduler.ApplyPorts(len(info.HostConfig.PortBindings))
+	if err != nil {
+		return id, containerName, errors.Wrapf(err, "portscheduler.ApplyPorts failed, info: %+v", info)
+	}
+
+	var index int
+	for k := range info.HostConfig.PortBindings {
+		info.HostConfig.PortBindings[k] = []nat.PortBinding{{
+			HostPort: strconv.Itoa(availableOSPorts[index]),
+		}}
+		index++
+	}
 	resp, err := docker.Cli.ContainerCreate(ctx, info.Config, info.HostConfig, info.NetworkingConfig, info.Platform, containerName)
 	if err != nil {
 		return id, containerName, errors.Wrapf(err, "docker.ContainerCreate failed, name: %s", containerName)
@@ -486,6 +515,23 @@ func (cs *ContainerService) containerDeviceRequestsDeviceIDs(name string) ([]str
 		return []string{}, nil
 	}
 	return resp.HostConfig.DeviceRequests[0].DeviceIDs, nil
+}
+
+func (cs *ContainerService) containerPortBindings(name string) ([]int, error) {
+	ctx := context.Background()
+	resp, err := docker.Cli.ContainerInspect(ctx, name)
+	if err != nil {
+		return nil, errors.Wrapf(err, "docker.ContainerInspect failed, name: %s", name)
+	}
+	if resp.HostConfig.PortBindings == nil {
+		return []int{}, nil
+	}
+	var ports []int
+	for _, v := range resp.HostConfig.PortBindings {
+		port, _ := strconv.Atoi(v[0].HostPort)
+		ports = append(ports, port)
+	}
+	return ports, nil
 }
 
 func (cs *ContainerService) newContainerResource(uuids []string) container.Resources {

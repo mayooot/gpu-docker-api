@@ -100,6 +100,7 @@ func (ch *ContainerHandler) delete(c *gin.Context) {
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
 		log.Errorf("failed to delete container, name %s must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
+		return
 	}
 
 	var spec model.ContainerDelete

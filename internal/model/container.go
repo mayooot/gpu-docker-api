@@ -1,35 +1,17 @@
 package model
 
 import (
-	"fmt"
-
 	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/go-connections/nat"
 )
 
 type ContainerRun struct {
-	ImageName     string   `json:"imageName"`
-	ContainerName string   `json:"containerName"`
-	GpuCount      int      `json:"gpuCount,omitempty"`
-	Binds         []Bind   `json:"binds,omitempty"`
-	Env           []string `json:"env,omitempty"`
-	Cmd           []string `json:"cmd,omitempty"`
-	Ports         []Ports  `json:"ports,omitempty"`
-}
-
-type Ports struct {
-	HostPort      uint16 `json:"hostPort"`
-	ContainerPort uint16 `json:"containerPort"`
-}
-
-func (p Ports) Key() nat.Port {
-	return nat.Port(fmt.Sprintf("%d/tcp", p.ContainerPort))
-}
-
-func (p Ports) Value() []nat.PortBinding {
-	return []nat.PortBinding{{
-		HostPort: fmt.Sprintf("%d", p.HostPort),
-	}}
+	ImageName      string   `json:"imageName"`
+	ContainerName  string   `json:"containerName"`
+	GpuCount       int      `json:"gpuCount,omitempty"`
+	Binds          []Bind   `json:"binds,omitempty"`
+	Env            []string `json:"env,omitempty"`
+	Cmd            []string `json:"cmd,omitempty"`
+	ContainerPorts []string `json:"containerPorts,omitempty"`
 }
 
 type ContainerExecute struct {

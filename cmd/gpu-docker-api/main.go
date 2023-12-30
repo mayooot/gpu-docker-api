@@ -16,7 +16,8 @@ import (
 	"github.com/mayooot/gpu-docker-api/internal/config"
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
-	"github.com/mayooot/gpu-docker-api/internal/gpuscheduler"
+	"github.com/mayooot/gpu-docker-api/internal/scheduler/gpuscheduler"
+	"github.com/mayooot/gpu-docker-api/internal/scheduler/portscheduler"
 	"github.com/mayooot/gpu-docker-api/internal/version"
 	"github.com/mayooot/gpu-docker-api/internal/workQueue"
 )
@@ -73,6 +74,10 @@ func (p *program) Init(svc.Environment) error {
 		return err
 	}
 
+	if err = portscheduler.Init(p.cfg); err != nil {
+		return err
+	}
+
 	if err = version.Init(); err != nil {
 		return err
 	}
@@ -84,10 +89,10 @@ func (p *program) Start() error {
 	var (
 		ch api.ContainerHandler
 		vh api.VolumeHandler
-		gh api.GpuHandler
+		gh api.Resource
 	)
 
-	gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.DebugMode)
 	r := gin.New()
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -118,6 +123,7 @@ func (p *program) Stop() error {
 	workQueue.Close()
 	docker.CloseDockerClient()
 	gpuscheduler.Close()
+	portscheduler.Close()
 	version.Close()
 	etcd.CloseEtcdClient()
 	return nil

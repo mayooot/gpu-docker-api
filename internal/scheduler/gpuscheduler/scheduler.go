@@ -2,12 +2,11 @@ package gpuscheduler
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"sync"
-
-	"github.com/pkg/errors"
 
 	"github.com/mayooot/gpu-docker-api/internal/config"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
@@ -15,11 +14,12 @@ import (
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
-// 默认的可用GPU 数量
-const defaultAvailableGpuNums = 8
-
-// gpuStatusMapKey 用于存储 GPU 使用信息的 key
-var gpuStatusMapKey = "gpuStatusMapKey"
+const (
+	// 默认的可用GPU 数量
+	defaultAvailableGpuNums = 8
+	// gpuStatusMapKey 用于存储 GPU 使用信息的 key
+	gpuStatusMapKey = "gpuStatusMapKey"
+)
 
 var Scheduler *scheduler
 
@@ -30,21 +30,9 @@ type scheduler struct {
 	GpuStatusMap     map[string]byte
 }
 
-func newScheduler() *scheduler {
-	return &scheduler{
-		GpuStatusMap: make(map[string]byte),
-	}
-}
-
-func (s *scheduler) serialize() *string {
-	bytes, _ := json.Marshal(s)
-	tmp := string(bytes)
-	return &tmp
-}
-
 func Init(cfg *config.Config) error {
 	var err error
-	Scheduler, err = initScheduler()
+	Scheduler, err = initFormEtcd()
 	if err != nil {
 		return err
 	}
@@ -66,8 +54,74 @@ func Init(cfg *config.Config) error {
 	return nil
 }
 
-func initScheduler() (s *scheduler, err error) {
-	s = newScheduler()
+func Close() error {
+	return etcd.Put(etcd.Gpus, gpuStatusMapKey, Scheduler.serialize())
+}
+
+// ApplyGpus 申请一定数量的 GPU
+func (s *scheduler) ApplyGpus(num int) ([]string, error) {
+	if num <= 0 || num > s.AvailableGpuNums {
+		return nil, errors.New("num must be greater than 0 and less than " + strconv.Itoa(s.AvailableGpuNums))
+	}
+
+	s.Lock()
+	defer s.Unlock()
+
+	// 可用的 gpu
+	var availableGpus []string
+	for k, v := range s.GpuStatusMap {
+		if v == 0 {
+			s.GpuStatusMap[k] = 1
+			availableGpus = append(availableGpus, k)
+			if len(availableGpus) == num {
+				break
+			}
+		}
+	}
+
+	// 小于用户申请的
+	if len(availableGpus) < num {
+		return nil, xerrors.NewGpuNotEnoughError()
+	}
+
+	return availableGpus, nil
+}
+
+// RestoreGpus 归还一定数量的 GPU
+func (s *scheduler) RestoreGpus(gpus []string) {
+	if len(gpus) <= 0 || len(gpus) > s.AvailableGpuNums {
+		return
+	}
+
+	s.Lock()
+	defer s.Unlock()
+
+	for _, gpu := range gpus {
+		s.GpuStatusMap[gpu] = 0
+	}
+}
+
+// GetGpusStatus 获取 GPU 使用信息
+func (s *scheduler) GetGpusStatus() map[string]byte {
+	s.RLock()
+	defer s.RUnlock()
+
+	return s.GpuStatusMap
+}
+
+func (s *scheduler) serialize() *string {
+	s.RLock()
+	defer s.RUnlock()
+
+	bytes, _ := json.Marshal(s)
+	tmp := string(bytes)
+	return &tmp
+}
+
+func initFormEtcd() (s *scheduler, err error) {
+	s = &scheduler{
+		GpuStatusMap: make(map[string]byte),
+	}
 	bytes, err := etcd.Get(etcd.Gpus, gpuStatusMapKey)
 	if err != nil {
 		return s, err
@@ -94,59 +148,4 @@ func getDetectGpus(addr string) (gpus []model.GpuInfo, err error) {
 		return gpus, err
 	}
 	return gpus, err
-}
-
-func Close() error {
-	return etcd.Put(etcd.Gpus, gpuStatusMapKey, Scheduler.serialize())
-}
-
-// ApplyGpus 申请一定数量的 GPU
-func (s *scheduler) ApplyGpus(num int) ([]string, error) {
-	if num <= 0 || num > s.AvailableGpuNums {
-		return nil, errors.New("num must be greater than 0 and less than " + strconv.Itoa(s.AvailableGpuNums))
-	}
-
-	s.Lock()
-	defer s.Unlock()
-
-	// 可用的 gpu
-	var availableGpus []string
-	for k, v := range s.GpuStatusMap {
-		if v == 0 {
-			availableGpus = append(availableGpus, k)
-		}
-	}
-
-	// 小于用户申请的
-	if len(availableGpus) < num {
-		return nil, xerrors.NewGpuNotEnoughError()
-	}
-
-	needGpus := availableGpus[:num]
-	for _, v := range needGpus {
-		s.GpuStatusMap[v] = 1
-	}
-	return needGpus, nil
-}
-
-// RestoreGpus 归还一定数量的 GPU
-func (s *scheduler) RestoreGpus(gpus []string) {
-	if len(gpus) <= 0 || len(gpus) > s.AvailableGpuNums {
-		return
-	}
-
-	s.Lock()
-	defer s.Unlock()
-
-	for _, gpu := range gpus {
-		s.GpuStatusMap[gpu] = 0
-	}
-}
-
-// GetGpuStatus 获取 GPU 使用信息
-func (s *scheduler) GetGpuStatus() map[string]byte {
-	s.RLock()
-	defer s.RUnlock()
-
-	return s.GpuStatusMap
 }
