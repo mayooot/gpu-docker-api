@@ -1,8 +1,10 @@
 package etcd
 
 import (
+	"context"
 	"time"
 
+	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/mayooot/gpu-docker-api/internal/config"
@@ -16,7 +18,12 @@ func InitEtcdClient(cfg *config.Config) error {
 		Endpoints:   []string{cfg.EtcdAddr},
 		DialTimeout: 5 * time.Second,
 	})
-	return err
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	if _, err = cli.Put(ctx, "/ping", "pong"); err != nil {
+		return errors.Wrap(err, "etcd client init failed")
+	}
+	return nil
 }
 
 func CloseEtcdClient() {

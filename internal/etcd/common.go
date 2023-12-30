@@ -4,6 +4,7 @@ import (
 	"context"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 )
@@ -23,6 +24,9 @@ const (
 	Volumes    EtcdResource = "volumes"
 	Versions   EtcdResource = "versions"
 	Gpus       EtcdResource = "gpus"
+	Ports      EtcdResource = "ports"
+
+	operationDuration = 1 * time.Second
 )
 
 type PutKeyValue struct {
@@ -37,7 +41,8 @@ type DelKey struct {
 }
 
 func Put(resource EtcdResource, key string, value *string) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), operationDuration)
+	defer cancel()
 	_, err := cli.Put(ctx, resourcePrefix(resource, realName(key)), *value)
 	if err != nil {
 		return errors.Wrapf(err, "etcd.Put failed, resource %s, key: %s, value: %s", resource, key, *value)
@@ -46,7 +51,8 @@ func Put(resource EtcdResource, key string, value *string) error {
 }
 
 func Get(resource EtcdResource, key string) (bytes []byte, err error) {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), operationDuration)
+	defer cancel()
 	resp, err := cli.Get(ctx, resourcePrefix(resource, realName(key)))
 	if err != nil {
 		return bytes, errors.Wrapf(err, "etcd.Get failed, key: %s", key)
@@ -59,7 +65,8 @@ func Get(resource EtcdResource, key string) (bytes []byte, err error) {
 }
 
 func Del(resource EtcdResource, key string) error {
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), operationDuration)
+	defer cancel()
 	_, err := cli.Delete(ctx, resourcePrefix(resource, realName(key)))
 	return err
 }
