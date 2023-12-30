@@ -26,6 +26,6 @@ func InitEtcdClient(cfg *config.Config) error {
 	return nil
 }
 
-func CloseEtcdClient() {
-	cli.Close()
+func CloseEtcdClient() error {
+	return cli.Close()
 }
