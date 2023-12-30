@@ -1,10 +1,15 @@
 # gin 启动端口
 port = ":2378"
 
-# etct 地址
+# etcd 地址
 etcd_addr = "127.0.0.1:2379"
 
 # detect-gpu http 服务地址
 detect_gpu_addr = "http://10.10.10.21:2376/api/v1/detect/gpu"
 # 宿主机的 gpu 数量
 available_gpu_nums = 8
+
+
+# 指定可用端口号的范围
+start_port = 40000
+end_port = 65535

@@ -62,6 +62,12 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 		vmap.VolumeVersionMap.Set(info.Opt.Name, sync2.AtomicInt64(version.Add(1)))
 	}
 
+	defer func() {
+		if err != nil {
+			vmap.VolumeVersionMap.Set(info.Opt.Name, sync2.AtomicInt64(version.Add(-1)))
+		}
+	}()
+
 	// 生成此次要创建的 Volume 的名称
 	info.Opt.Name = fmt.Sprintf("%s-%d", info.Opt.Name, version)
 	resp, err = docker.Cli.VolumeCreate(ctx, *info.Opt)

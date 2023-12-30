@@ -421,6 +421,12 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 		vmap.ContainerVersionMap.Set(name, sync2.AtomicInt64(version.Add(1)))
 	}
 
+	defer func() {
+		if err != nil {
+			vmap.ContainerVersionMap.Set(name, sync2.AtomicInt64(version.Add(-1)))
+		}
+	}()
+
 	// 生成此次要创建的容器的名称
 	containerName = fmt.Sprintf("%s-%d", name, version)
 	resp, err := docker.Cli.ContainerCreate(ctx, info.Config, info.HostConfig, info.NetworkingConfig, info.Platform, containerName)

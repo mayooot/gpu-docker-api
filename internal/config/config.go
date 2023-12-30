@@ -11,6 +11,8 @@ type Config struct {
 	EtcdAddr         string `toml:"etcd_addr"`
 	DetectGPUAddr    string `toml:"detect_gpu_addr"`
 	AvailableGpuNums int    `toml:"available_gpu_nums"`
+	StartPort        int    `toml:"start_port"`
+	EndPort          int    `toml:"end_port"`
 }
 
 func NewConfigWithFile(name string) (*Config, error) {
