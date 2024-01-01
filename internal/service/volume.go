@@ -186,6 +186,18 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 	return
 }
 
+func (vs *VolumeService) GetVolumeInfo(name string) (info model.EtcdVolumeInfo, err error) {
+	infoBytes, err := etcd.Get(etcd.Volumes, name)
+	if err != nil {
+		return info, errors.WithMessage(err, "etcd.Get failed")
+	}
+
+	if err = json.Unmarshal(infoBytes, &info); err != nil {
+		return info, errors.WithMessage(err, "json.Unmarshal failed")
+	}
+	return
+}
+
 // 判断 Volume 是否存在
 func (vs *VolumeService) existVolume(name string) bool {
 	ctx := context.Background()

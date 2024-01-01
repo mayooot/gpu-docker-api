@@ -34,7 +34,7 @@ func (ch *ContainerHandler) RegisterRoute(g *gin.RouterGroup) {
 	// 提交容器为镜像
 	g.POST("/containers/:name/commit", ch.commit)
 	// 查看容器创建信息
-	g.GET("/containers/:name/info", ch.info)
+	g.GET("/containers/:name", ch.info)
 }
 
 func (ch *ContainerHandler) run(c *gin.Context) {
@@ -337,13 +337,14 @@ func (ch *ContainerHandler) info(c *gin.Context) {
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
 		log.Errorf("failed to get container info, name: %s must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
+		return
 	}
 
 	info, err := cs.GetContainerInfo(name)
 	if err != nil {
 		log.Errorf("service.GetContainerInfo failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
-		ResponseError(c, CodeContainerCommitFailed)
+		ResponseError(c, CodeContainerGetInfoFailed)
 		return
 	}
 

@@ -11,7 +11,7 @@ type Resource struct{}
 
 func (gh *Resource) RegisterRoute(g *gin.RouterGroup) {
 	g.GET("/resources/gpus", gh.getGpus)
-	g.GET("resources/usedPorts", gh.getUsedPorts)
+	g.GET("resources/ports", gh.getUsedPorts)
 }
 
 func (gh *Resource) getGpus(c *gin.Context) {
@@ -22,8 +22,8 @@ func (gh *Resource) getGpus(c *gin.Context) {
 }
 
 func (gh *Resource) getUsedPorts(c *gin.Context) {
-	ports := portscheduler.Scheduler.GetUsedPortSet()
+	status := portscheduler.Scheduler.GetPortStatus()
 	ResponseSuccess(c, gin.H{
-		"usedPorts": ports,
+		"portStatus": status,
 	})
 }

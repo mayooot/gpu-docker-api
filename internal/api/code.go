@@ -26,8 +26,9 @@ const (
 	CodeContainerGpuCountMustGreaterThanZero
 	CodeContainerGpuNotEnough
 	CodeContainerGpuNoNeedPatch
+	CodeContainerVolumeNoNeedPatch
 	CodeContainerCommitFailed
-	COdeContainerGetInfoFailed
+	CodeContainerGetInfoFailed
 
 	CodeVolumeCreateFailed
 	CodeVolumeNameNotNull
@@ -39,7 +40,7 @@ const (
 	CodeVolumeSizeUsedGreaterThanReduce
 	CodeVolumeNameNotContainsDash
 	CodeVolumeNameNotBeginWithForwardSlash
-	CodeContainerVolumeNoNeedPatch
+	CodeVolumeGetInfoFailed
 
 	CodeEtcdDeleteFailed
 
@@ -72,7 +73,7 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerGpuNoNeedPatch:              "容器 GPU 资源不需要更新，因为更新前后数量一样",
 	CodeContainerVolumeNoNeedPatch:           "容器 Volume 挂载不需要更新，因为更新前后挂载一样",
 	CodeContainerCommitFailed:                "容器提交为镜像失败",
-	COdeContainerGetInfoFailed:               "获取容器信息失败",
+	CodeContainerGetInfoFailed:               "获取容器信息失败",
 
 	CodeVolumeCreateFailed:                 "Volume 创建失败",
 	CodeVolumeNameNotNull:                  "Volume name 不能为空",
@@ -84,6 +85,7 @@ var codeMsgMap = map[ResCode]string{
 	CodeVolumeSizeUsedGreaterThanReduce:    "Volume 大小更新失败，因为更新后的大小小于已使用的大小",
 	CodeVolumeNameNotContainsDash:          "Volume 名称不能包含-",
 	CodeVolumeNameNotBeginWithForwardSlash: "Volume 名称不能以 / 开头",
+	CodeVolumeGetInfoFailed:                "获取 Volume 信息失败",
 
 	CodeEtcdDeleteFailed: "删除 etcd 中的资源失败",
 

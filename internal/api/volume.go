@@ -23,6 +23,8 @@ func (vh *VolumeHandler) RegisterRoute(g *gin.RouterGroup) {
 	g.DELETE("/volumes/:name", vh.delete)
 	// 变更已存在 Volume 的大小
 	g.PATCH("/volumes/:name/size", vh.patchSize)
+	// 查看 Volume 创建信息
+	g.GET("/volumes/:name", vh.info)
 }
 
 func (vh *VolumeHandler) create(c *gin.Context) {
@@ -144,5 +146,32 @@ func (vh *VolumeHandler) patchSize(c *gin.Context) {
 	ResponseSuccess(c, gin.H{
 		"name": resp.Name,
 		"size": resp.Options["size"],
+	})
+}
+
+func (vh *VolumeHandler) info(c *gin.Context) {
+	name := c.Param("name")
+	if len(name) == 0 {
+		log.Error("failed to get volume info, name is empty")
+		ResponseError(c, CodeVolumeNameNotNull)
+		return
+	}
+
+	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
+		log.Errorf("failed to get volume info, name: %s must be in format: name-version", name)
+		ResponseError(c, CodeVolumeNameMustContainVersion)
+		return
+	}
+
+	info, err := vs.GetVolumeInfo(name)
+	if err != nil {
+		log.Errorf("service.GetVolumeInfo failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("stack trace: \n%+v\n", err)
+		ResponseError(c, CodeVolumeGetInfoFailed)
+		return
+	}
+
+	ResponseSuccess(c, gin.H{
+		"info": info,
 	})
 }
