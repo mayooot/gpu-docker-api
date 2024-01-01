@@ -124,12 +124,11 @@ func (s *scheduler) RestorePorts(ports []int) {
 	}
 }
 
-// GetUsedPortSet 获取 GPU 使用信息
-func (s *scheduler) GetUsedPortSet() map[int]struct{} {
+// GetPortStatus 获取 Port 使用情况
+func (s *scheduler) GetPortStatus() *scheduler {
 	s.RLock()
 	defer s.RUnlock()
-
-	return s.UsedPortSet
+	return s
 }
 
 func (s *scheduler) serialize() *string {
@@ -144,7 +143,11 @@ func (s *scheduler) serialize() *string {
 func initFormEtcd() (s *scheduler, err error) {
 	bytes, err := etcd.Get(etcd.Ports, usedPortSetKey)
 	if err != nil {
-		return s, err
+		if xerrors.IsNotExistInEtcdError(err) {
+			err = nil
+		} else {
+			return s, err
+		}
 	}
 
 	var alias alias

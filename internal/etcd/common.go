@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+
+	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 const (
@@ -57,11 +59,10 @@ func Get(resource EtcdResource, key string) (bytes []byte, err error) {
 	if err != nil {
 		return bytes, errors.Wrapf(err, "etcd.Get failed, key: %s", key)
 	}
-
-	if len(resp.Kvs) != 0 {
-		bytes = resp.Kvs[0].Value
+	if len(resp.Kvs) == 0 {
+		return bytes, errors.Wrapf(xerrors.NewNotExistInEtcdError(), "etcd.Get failed, key: %s", key)
 	}
-	return bytes, err
+	return resp.Kvs[0].Value, err
 }
 
 func Del(resource EtcdResource, key string) error {

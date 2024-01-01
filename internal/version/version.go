@@ -7,6 +7,7 @@ import (
 	"github.com/siddontang/go/sync2"
 
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
+	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 var (
@@ -64,7 +65,11 @@ func Close() error {
 func initVersionMap(key string) (vm *versionMap, err error) {
 	bytes, err := etcd.Get(etcd.Versions, key)
 	if err != nil {
-		return vm, err
+		if xerrors.IsNotExistInEtcdError(err) {
+			err = nil
+		} else {
+			return vm, err
+		}
 	}
 
 	vm = newVersionMap()

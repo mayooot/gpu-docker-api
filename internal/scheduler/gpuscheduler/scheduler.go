@@ -123,7 +123,11 @@ func (s *scheduler) serialize() *string {
 func initFormEtcd() (s *scheduler, err error) {
 	bytes, err := etcd.Get(etcd.Gpus, gpuStatusMapKey)
 	if err != nil {
-		return s, err
+		if xerrors.IsNotExistInEtcdError(err) {
+			err = nil
+		} else {
+			return s, err
+		}
 	}
 
 	s = &scheduler{
