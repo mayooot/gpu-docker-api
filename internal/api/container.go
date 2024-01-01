@@ -248,7 +248,14 @@ func (ch *ContainerHandler) stop(c *gin.Context) {
 		ResponseError(c, CodeContainerNameMustContainVersion)
 	}
 
-	if err := cs.StopContainer(name); err != nil {
+	var spec model.ContainerStop
+	if err := c.ShouldBindJSON(&spec); err != nil {
+		log.Error("failed to stop container, error:", err.Error())
+		ResponseError(c, CodeInvalidParams)
+		return
+	}
+
+	if err := cs.StopContainer(name, &spec); err != nil {
 		log.Errorf("service.StopContainer failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
 		ResponseError(c, CodeContainerStopFailed)

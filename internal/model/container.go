@@ -30,10 +30,15 @@ type ContainerVolumePatch struct {
 }
 
 type ContainerDelete struct {
-	Force                       bool `json:"force"`
-	DelEtcdInfoAndVersionRecord bool `json:"delEtcdInfoAndVersionRecord"`
+	Force                       bool `json:"force,omitempty"`
+	DelEtcdInfoAndVersionRecord bool `json:"delEtcdInfoAndVersionRecord,omitempty"`
 }
 
 type ContainerCommit struct {
 	NewImageName string `json:"newImageName"`
+}
+
+type ContainerStop struct {
+	RestoreGpus  bool `json:"restoreGpus,omitempty"`
+	RestorePorts bool `json:"restorePorts,omitempty"`
 }

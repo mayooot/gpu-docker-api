@@ -56,14 +56,16 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 		Tty:       true,
 	}
 
-	// 只想容器要暴露的端口，添加到创建容器的信息中
+	// 只将容器要暴露的端口，添加到创建容器的信息中
 	// 具体这个端口要映射到宿主机的哪个端口，交给 runContainer 方法
 	// 这样做的好处就是，不管是创建容器、变更容器 GPU/Volume、重启动容器，都无需关心端口的配置
-	hostConfig.PortBindings = make(nat.PortMap, len(spec.ContainerPorts))
-	config.ExposedPorts = make(nat.PortSet, len(spec.ContainerPorts))
-	for _, port := range spec.ContainerPorts {
-		config.ExposedPorts[nat.Port(port+"/tcp")] = struct{}{}
-		hostConfig.PortBindings[nat.Port(port+"/tcp")] = nil
+	if len(spec.ContainerPorts) > 0 {
+		hostConfig.PortBindings = make(nat.PortMap, len(spec.ContainerPorts))
+		config.ExposedPorts = make(nat.PortSet, len(spec.ContainerPorts))
+		for _, port := range spec.ContainerPorts {
+			config.ExposedPorts[nat.Port(port+"/tcp")] = struct{}{}
+			hostConfig.PortBindings[nat.Port(port+"/tcp")] = nil
+		}
 	}
 
 	// 绑定 GPU 资源信息
@@ -188,7 +190,8 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
-	// 只有 etcd 中的 Volume 对象的版本和要修改的 Volume 版本一致时，才能更新
+	// 只有 etcd 中的 Container 对象的版本和要修改的 Container 版本一致时，才能更新
+	// 也就是说，当前容器经过更新，版本号已经为 2 了，此时你就不能对版本号为 0、1 的容器进行更新操作
 	if strconv.FormatInt(info.Version, 10) != strings.Split(name, "-")[1] {
 		return id, newContainerName, errors.Wrapf(xerrors.NewVersionNotMatchError(),
 			"container: %s, etcd version: %d, patch version: %s", name, info.Version, strings.Split(name, "-")[1])
@@ -254,6 +257,14 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 		OldResource: info.ContainerName,
 		NewResource: newContainerName,
 	}
+
+	// 停止旧的容器
+	// 选择不归还 GPU 资源，因为降低 GPU 配置时，已经归还了 GPU 资源。而升级配置时，会使用原有的卡，所以不需要归还
+	_ = cs.StopContainer(name, &model.ContainerStop{
+		RestoreGpus:  false,
+		RestorePorts: true,
+	})
+
 	log.Infof("service.PatchContainerGpuInfo, container: %s patch gpu info successfully", name)
 	return
 }
@@ -278,7 +289,7 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
 
-	// 只有 etcd 中的 Volume 对象的版本和要修改的 Volume 版本一致时，才能更新
+	// 只有 etcd 中的 Container 对象的版本和要修改的 Container 版本一致时，才能更新
 	if strconv.FormatInt(info.Version, 10) != strings.Split(name, "-")[1] {
 		return id, newContainerName, errors.Wrapf(xerrors.NewVersionNotMatchError(),
 			"container: %s, etcd version: %d, patch version: %s", name, info.Version, strings.Split(name, "-")[1])
@@ -305,27 +316,39 @@ func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.Co
 		NewResource: newContainerName,
 	}
 
+	// 停止旧的容器
+	// 选择不归还 GPU 资源，因为更改 Volume 配置不涉及 GPU 资源的申请与释放
+	_ = cs.StopContainer(name, &model.ContainerStop{
+		RestoreGpus:  false,
+		RestorePorts: true,
+	})
+
 	log.Infof("service.PatchContainerVolumeInfo, container: %s patch volume info successfully", name)
 	return
 }
 
-// StopContainer 停止容器，会归还端口资源，如果是 GPU 容器，会归还使用的资源
-func (cs *ContainerService) StopContainer(name string) error {
-	// 归还 gpu 资源
-	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
-	if err != nil {
-		return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+// StopContainer 停止容器
+// restoreGpus 是否释放 gpu 资源
+// restorePorts 是否释放端口资源
+func (cs *ContainerService) StopContainer(name string, spec *model.ContainerStop) error {
+	if spec.RestoreGpus {
+		// 归还 gpu 资源
+		uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
+		if err != nil {
+			return errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+		}
+		gpuscheduler.Scheduler.RestoreGpus(uuids)
+		log.Infof("service.StopContainer, container: %s restore %d gpus, uuids: %+v",
+			name, len(uuids), uuids)
 	}
-	gpuscheduler.Scheduler.RestoreGpus(uuids)
-	log.Infof("service.StopContainer, container: %s restore %d gpus, uuids: %+v",
-		name, len(uuids), uuids)
-
-	// 归还端口资源
-	ports, err := cs.containerPortBindings(name)
-	if err != nil {
-		return errors.WithMessage(err, "service.containerPortBindings failed")
+	if spec.RestorePorts {
+		// 归还端口资源
+		ports, err := cs.containerPortBindings(name)
+		if err != nil {
+			return errors.WithMessage(err, "service.containerPortBindings failed")
+		}
+		portscheduler.Scheduler.RestorePorts(ports)
 	}
-	portscheduler.Scheduler.RestorePorts(ports)
 
 	// 停止容器
 	ctx := context.Background()
@@ -423,6 +446,18 @@ func (cs *ContainerService) CommitContainer(name string, spec model.ContainerCom
 	return imageName, err
 }
 
+func (cs *ContainerService) GetContainerInfo(name string) (info model.EtcdContainerInfo, err error) {
+	infoBytes, err := etcd.Get(etcd.Containers, name)
+	if err != nil {
+		return info, errors.WithMessage(err, "etcd.Get failed")
+	}
+
+	if err = json.Unmarshal(infoBytes, &info); err != nil {
+		return info, errors.WithMessage(err, "json.Unmarshal failed")
+	}
+	return
+}
+
 // 真正创建容器和启动容器的方法，这个方法不区分是用来创建 GPU 容器还是普通容器，因为它只会根据入参来创建容器
 // 用于创建容器、变更容器的 GPU 信息、变更容器的 Volume 信息、重启动 GPU 容器等
 func (cs *ContainerService) runContainer(ctx context.Context, name string, info model.EtcdContainerInfo) (id, containerName string, err error) {
@@ -450,18 +485,22 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 	// 生成此次要创建的容器的名称
 	containerName = fmt.Sprintf("%s-%d", name, version)
 
-	availableOSPorts, err := portscheduler.Scheduler.ApplyPorts(len(info.HostConfig.PortBindings))
-	if err != nil {
-		return id, containerName, errors.Wrapf(err, "portscheduler.ApplyPorts failed, info: %+v", info)
+	// 申请宿主机端口
+	if info.HostConfig.PortBindings != nil && len(info.HostConfig.PortBindings) > 0 {
+		availableOSPorts, err := portscheduler.Scheduler.ApplyPorts(len(info.HostConfig.PortBindings))
+		if err != nil {
+			return id, containerName, errors.Wrapf(err, "portscheduler.ApplyPorts failed, info: %+v", info)
+		}
+		var index int
+		for k := range info.HostConfig.PortBindings {
+			info.HostConfig.PortBindings[k] = []nat.PortBinding{{
+				HostPort: strconv.Itoa(availableOSPorts[index]),
+			}}
+			index++
+		}
 	}
 
-	var index int
-	for k := range info.HostConfig.PortBindings {
-		info.HostConfig.PortBindings[k] = []nat.PortBinding{{
-			HostPort: strconv.Itoa(availableOSPorts[index]),
-		}}
-		index++
-	}
+	// 创建容器
 	resp, err := docker.Cli.ContainerCreate(ctx, info.Config, info.HostConfig, info.NetworkingConfig, info.Platform, containerName)
 	if err != nil {
 		return id, containerName, errors.Wrapf(err, "docker.ContainerCreate failed, name: %s", containerName)
@@ -521,6 +560,7 @@ func (cs *ContainerService) containerDeviceRequestsDeviceIDs(name string) ([]str
 	return resp.HostConfig.DeviceRequests[0].DeviceIDs, nil
 }
 
+// 获取容器的端口绑定信息
 func (cs *ContainerService) containerPortBindings(name string) ([]int, error) {
 	ctx := context.Background()
 	resp, err := docker.Cli.ContainerInspect(ctx, name)
