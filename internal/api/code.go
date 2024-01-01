@@ -27,6 +27,7 @@ const (
 	CodeContainerGpuNotEnough
 	CodeContainerGpuNoNeedPatch
 	CodeContainerCommitFailed
+	COdeContainerGetInfoFailed
 
 	CodeVolumeCreateFailed
 	CodeVolumeNameNotNull
@@ -71,6 +72,7 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerGpuNoNeedPatch:              "容器 GPU 资源不需要更新，因为更新前后数量一样",
 	CodeContainerVolumeNoNeedPatch:           "容器 Volume 挂载不需要更新，因为更新前后挂载一样",
 	CodeContainerCommitFailed:                "容器提交为镜像失败",
+	COdeContainerGetInfoFailed:               "获取容器信息失败",
 
 	CodeVolumeCreateFailed:                 "Volume 创建失败",
 	CodeVolumeNameNotNull:                  "Volume name 不能为空",
