@@ -13,7 +13,7 @@
       "name": "卷"
     },
     {
-      "name": "GPU"
+      "name": "资源"
     }
   ],
   "paths": {
@@ -128,7 +128,7 @@
         "x-apifox-folder": "容器",
         "x-apifox-status": "released",
         "deprecated": false,
-        "description": "### 更改容器的 GPU 配置\n\n> 1. 如果调用接口前后，容器的 GPU 数量不变，那么会直接跳过。比如有卡容器使用了 3 张卡，调用接口时传递的 gpuCount 仍然为 3。无卡容器的 gpuCount 为 0，调用接口时传递的 gpuCount 仍然为 0。\n> 2. 升降 GPU 配置时，会重新创建一个容器，比如 foo-0 容器的 gpuCount 为 3，升级到 5 张卡，新的容器名称为 foo-1。此时不能再对 foo-0 进行更改 GPU/更改 Volume 的操作，因为最新版本是 foo-0。\n> 3. 可以将无卡容器变为有卡容器，也可将有卡容器转为无卡容器，当然也可以升降有卡容器的 GPU 卡数。",
+        "description": "### 更改容器的 GPU 配置\n\n> 1. 如果调用接口前后，容器的 GPU 数量不变，那么会直接跳过。比如有卡容器使用了 3 张卡，调用接口时传递的 gpuCount 仍然为 3。无卡容器的 gpuCount 为 0，调用接口时传递的 gpuCount 仍然为 0。\n> 2. 升降 GPU 配置时，会重新创建一个容器，比如 foo-0 容器的 gpuCount 为 3，升级到 5 张卡，新的容器名称为 foo-1。此时不能再对 foo-0 进行更改 GPU/更改 Volume 的操作，因为最新版本是 foo-0。\n> 3. 可以将无卡容器变为有卡容器，也可将有卡容器转为无卡容器，当然也可以升降有卡容器的 GPU 卡数。\n> 有卡容器变为无卡容器，gpuCount 为 0。无卡容器变有卡，gpuCount > 0 即可。",
         "tags": [
           "容器"
         ],
@@ -716,17 +716,771 @@
           }
         },
         "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326937-run"
-      }
-    },
-    "/api/v1/gpus": {
+      },
       "get": {
-        "summary": "查看GPU使用状态",
-        "x-apifox-folder": "GPU",
+        "summary": "获取容器信息",
+        "x-apifox-folder": "容器",
         "x-apifox-status": "released",
         "deprecated": false,
-        "description": "### 查看 GPU 使用情况\n\n描述：key：GPU UUID  value：占用情况，0 代表未被占用，1 代表已被占用",
+        "description": "# 获取容器存储在 ETCD 中的创建信息\n> TODO：获取历史版本的创建信息还没有开始开发\n\n例如 name 为 contempt 的容器，经过一次更新 GPU 操作，生成了一个新容器：contempt-1。\n此时无论你调用接口时传递 contempt-0 还是 contempt-1 都只会返回最新的容器创建信息。也就是 contempt-1。\n",
         "tags": [
-          "GPU"
+          "容器"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "容器名称",
+            "required": true,
+            "example": " contempt-0",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "info": {
+                          "type": "object",
+                          "properties": {
+                            "Config": {
+                              "type": "object",
+                              "properties": {
+                                "Hostname": {
+                                  "type": "string"
+                                },
+                                "Domainname": {
+                                  "type": "string"
+                                },
+                                "User": {
+                                  "type": "string"
+                                },
+                                "AttachStdin": {
+                                  "type": "boolean"
+                                },
+                                "AttachStdout": {
+                                  "type": "boolean"
+                                },
+                                "AttachStderr": {
+                                  "type": "boolean"
+                                },
+                                "Tty": {
+                                  "type": "boolean"
+                                },
+                                "OpenStdin": {
+                                  "type": "boolean"
+                                },
+                                "StdinOnce": {
+                                  "type": "boolean"
+                                },
+                                "Env": {
+                                  "type": "null"
+                                },
+                                "Cmd": {
+                                  "type": "null"
+                                },
+                                "Image": {
+                                  "type": "string"
+                                },
+                                "Volumes": {
+                                  "type": "null"
+                                },
+                                "WorkingDir": {
+                                  "type": "string"
+                                },
+                                "Entrypoint": {
+                                  "type": "null"
+                                },
+                                "OnBuild": {
+                                  "type": "null"
+                                },
+                                "Labels": {
+                                  "type": "null"
+                                }
+                              },
+                              "required": [
+                                "Hostname",
+                                "Domainname",
+                                "User",
+                                "AttachStdin",
+                                "AttachStdout",
+                                "AttachStderr",
+                                "Tty",
+                                "OpenStdin",
+                                "StdinOnce",
+                                "Env",
+                                "Cmd",
+                                "Image",
+                                "Volumes",
+                                "WorkingDir",
+                                "Entrypoint",
+                                "OnBuild",
+                                "Labels"
+                              ],
+                              "x-apifox-orders": [
+                                "Hostname",
+                                "Domainname",
+                                "User",
+                                "AttachStdin",
+                                "AttachStdout",
+                                "AttachStderr",
+                                "Tty",
+                                "OpenStdin",
+                                "StdinOnce",
+                                "Env",
+                                "Cmd",
+                                "Image",
+                                "Volumes",
+                                "WorkingDir",
+                                "Entrypoint",
+                                "OnBuild",
+                                "Labels"
+                              ],
+                              "x-apifox-ignore-properties": []
+                            },
+                            "HostConfig": {
+                              "type": "object",
+                              "properties": {
+                                "Binds": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "ContainerIDFile": {
+                                  "type": "string"
+                                },
+                                "LogConfig": {
+                                  "type": "object",
+                                  "properties": {
+                                    "Type": {
+                                      "type": "string"
+                                    },
+                                    "Config": {
+                                      "type": "null"
+                                    }
+                                  },
+                                  "required": [
+                                    "Type",
+                                    "Config"
+                                  ],
+                                  "x-apifox-orders": [
+                                    "Type",
+                                    "Config"
+                                  ],
+                                  "x-apifox-ignore-properties": []
+                                },
+                                "NetworkMode": {
+                                  "type": "string"
+                                },
+                                "PortBindings": {
+                                  "type": "null"
+                                },
+                                "RestartPolicy": {
+                                  "type": "object",
+                                  "properties": {
+                                    "Name": {
+                                      "type": "string"
+                                    },
+                                    "MaximumRetryCount": {
+                                      "type": "integer"
+                                    }
+                                  },
+                                  "required": [
+                                    "Name",
+                                    "MaximumRetryCount"
+                                  ],
+                                  "x-apifox-orders": [
+                                    "Name",
+                                    "MaximumRetryCount"
+                                  ],
+                                  "x-apifox-ignore-properties": []
+                                },
+                                "AutoRemove": {
+                                  "type": "boolean"
+                                },
+                                "VolumeDriver": {
+                                  "type": "string"
+                                },
+                                "VolumesFrom": {
+                                  "type": "null"
+                                },
+                                "ConsoleSize": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "integer"
+                                  }
+                                },
+                                "CapAdd": {
+                                  "type": "null"
+                                },
+                                "CapDrop": {
+                                  "type": "null"
+                                },
+                                "CgroupnsMode": {
+                                  "type": "string"
+                                },
+                                "Dns": {
+                                  "type": "null"
+                                },
+                                "DnsOptions": {
+                                  "type": "null"
+                                },
+                                "DnsSearch": {
+                                  "type": "null"
+                                },
+                                "ExtraHosts": {
+                                  "type": "null"
+                                },
+                                "GroupAdd": {
+                                  "type": "null"
+                                },
+                                "IpcMode": {
+                                  "type": "string"
+                                },
+                                "Cgroup": {
+                                  "type": "string"
+                                },
+                                "Links": {
+                                  "type": "null"
+                                },
+                                "OomScoreAdj": {
+                                  "type": "integer"
+                                },
+                                "PidMode": {
+                                  "type": "string"
+                                },
+                                "Privileged": {
+                                  "type": "boolean"
+                                },
+                                "PublishAllPorts": {
+                                  "type": "boolean"
+                                },
+                                "ReadonlyRootfs": {
+                                  "type": "boolean"
+                                },
+                                "SecurityOpt": {
+                                  "type": "null"
+                                },
+                                "UTSMode": {
+                                  "type": "string"
+                                },
+                                "UsernsMode": {
+                                  "type": "string"
+                                },
+                                "ShmSize": {
+                                  "type": "integer"
+                                },
+                                "Isolation": {
+                                  "type": "string"
+                                },
+                                "CpuShares": {
+                                  "type": "integer"
+                                },
+                                "Memory": {
+                                  "type": "integer"
+                                },
+                                "NanoCpus": {
+                                  "type": "integer"
+                                },
+                                "CgroupParent": {
+                                  "type": "string"
+                                },
+                                "BlkioWeight": {
+                                  "type": "integer"
+                                },
+                                "BlkioWeightDevice": {
+                                  "type": "null"
+                                },
+                                "BlkioDeviceReadBps": {
+                                  "type": "null"
+                                },
+                                "BlkioDeviceWriteBps": {
+                                  "type": "null"
+                                },
+                                "BlkioDeviceReadIOps": {
+                                  "type": "null"
+                                },
+                                "BlkioDeviceWriteIOps": {
+                                  "type": "null"
+                                },
+                                "CpuPeriod": {
+                                  "type": "integer"
+                                },
+                                "CpuQuota": {
+                                  "type": "integer"
+                                },
+                                "CpuRealtimePeriod": {
+                                  "type": "integer"
+                                },
+                                "CpuRealtimeRuntime": {
+                                  "type": "integer"
+                                },
+                                "CpusetCpus": {
+                                  "type": "string"
+                                },
+                                "CpusetMems": {
+                                  "type": "string"
+                                },
+                                "Devices": {
+                                  "type": "null"
+                                },
+                                "DeviceCgroupRules": {
+                                  "type": "null"
+                                },
+                                "DeviceRequests": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "Driver": {
+                                        "type": "string"
+                                      },
+                                      "Count": {
+                                        "type": "integer"
+                                      },
+                                      "DeviceIDs": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      },
+                                      "Capabilities": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "array",
+                                          "items": {
+                                            "type": "string"
+                                          }
+                                        }
+                                      },
+                                      "Options": {
+                                        "type": "null"
+                                      }
+                                    },
+                                    "x-apifox-orders": [
+                                      "Driver",
+                                      "Count",
+                                      "DeviceIDs",
+                                      "Capabilities",
+                                      "Options"
+                                    ],
+                                    "x-apifox-ignore-properties": []
+                                  }
+                                },
+                                "MemoryReservation": {
+                                  "type": "integer"
+                                },
+                                "MemorySwap": {
+                                  "type": "integer"
+                                },
+                                "MemorySwappiness": {
+                                  "type": "null"
+                                },
+                                "OomKillDisable": {
+                                  "type": "null"
+                                },
+                                "PidsLimit": {
+                                  "type": "null"
+                                },
+                                "Ulimits": {
+                                  "type": "null"
+                                },
+                                "CpuCount": {
+                                  "type": "integer"
+                                },
+                                "CpuPercent": {
+                                  "type": "integer"
+                                },
+                                "IOMaximumIOps": {
+                                  "type": "integer"
+                                },
+                                "IOMaximumBandwidth": {
+                                  "type": "integer"
+                                },
+                                "MaskedPaths": {
+                                  "type": "null"
+                                },
+                                "ReadonlyPaths": {
+                                  "type": "null"
+                                }
+                              },
+                              "required": [
+                                "Binds",
+                                "ContainerIDFile",
+                                "LogConfig",
+                                "NetworkMode",
+                                "PortBindings",
+                                "RestartPolicy",
+                                "AutoRemove",
+                                "VolumeDriver",
+                                "VolumesFrom",
+                                "ConsoleSize",
+                                "CapAdd",
+                                "CapDrop",
+                                "CgroupnsMode",
+                                "Dns",
+                                "DnsOptions",
+                                "DnsSearch",
+                                "ExtraHosts",
+                                "GroupAdd",
+                                "IpcMode",
+                                "Cgroup",
+                                "Links",
+                                "OomScoreAdj",
+                                "PidMode",
+                                "Privileged",
+                                "PublishAllPorts",
+                                "ReadonlyRootfs",
+                                "SecurityOpt",
+                                "UTSMode",
+                                "UsernsMode",
+                                "ShmSize",
+                                "Isolation",
+                                "CpuShares",
+                                "Memory",
+                                "NanoCpus",
+                                "CgroupParent",
+                                "BlkioWeight",
+                                "BlkioWeightDevice",
+                                "BlkioDeviceReadBps",
+                                "BlkioDeviceWriteBps",
+                                "BlkioDeviceReadIOps",
+                                "BlkioDeviceWriteIOps",
+                                "CpuPeriod",
+                                "CpuQuota",
+                                "CpuRealtimePeriod",
+                                "CpuRealtimeRuntime",
+                                "CpusetCpus",
+                                "CpusetMems",
+                                "Devices",
+                                "DeviceCgroupRules",
+                                "DeviceRequests",
+                                "MemoryReservation",
+                                "MemorySwap",
+                                "MemorySwappiness",
+                                "OomKillDisable",
+                                "PidsLimit",
+                                "Ulimits",
+                                "CpuCount",
+                                "CpuPercent",
+                                "IOMaximumIOps",
+                                "IOMaximumBandwidth",
+                                "MaskedPaths",
+                                "ReadonlyPaths"
+                              ],
+                              "x-apifox-orders": [
+                                "Binds",
+                                "ContainerIDFile",
+                                "LogConfig",
+                                "NetworkMode",
+                                "PortBindings",
+                                "RestartPolicy",
+                                "AutoRemove",
+                                "VolumeDriver",
+                                "VolumesFrom",
+                                "ConsoleSize",
+                                "CapAdd",
+                                "CapDrop",
+                                "CgroupnsMode",
+                                "Dns",
+                                "DnsOptions",
+                                "DnsSearch",
+                                "ExtraHosts",
+                                "GroupAdd",
+                                "IpcMode",
+                                "Cgroup",
+                                "Links",
+                                "OomScoreAdj",
+                                "PidMode",
+                                "Privileged",
+                                "PublishAllPorts",
+                                "ReadonlyRootfs",
+                                "SecurityOpt",
+                                "UTSMode",
+                                "UsernsMode",
+                                "ShmSize",
+                                "Isolation",
+                                "CpuShares",
+                                "Memory",
+                                "NanoCpus",
+                                "CgroupParent",
+                                "BlkioWeight",
+                                "BlkioWeightDevice",
+                                "BlkioDeviceReadBps",
+                                "BlkioDeviceWriteBps",
+                                "BlkioDeviceReadIOps",
+                                "BlkioDeviceWriteIOps",
+                                "CpuPeriod",
+                                "CpuQuota",
+                                "CpuRealtimePeriod",
+                                "CpuRealtimeRuntime",
+                                "CpusetCpus",
+                                "CpusetMems",
+                                "Devices",
+                                "DeviceCgroupRules",
+                                "DeviceRequests",
+                                "MemoryReservation",
+                                "MemorySwap",
+                                "MemorySwappiness",
+                                "OomKillDisable",
+                                "PidsLimit",
+                                "Ulimits",
+                                "CpuCount",
+                                "CpuPercent",
+                                "IOMaximumIOps",
+                                "IOMaximumBandwidth",
+                                "MaskedPaths",
+                                "ReadonlyPaths"
+                              ],
+                              "x-apifox-ignore-properties": []
+                            },
+                            "NetworkingConfig": {
+                              "type": "object",
+                              "properties": {
+                                "EndpointsConfig": {
+                                  "type": "null"
+                                }
+                              },
+                              "required": [
+                                "EndpointsConfig"
+                              ],
+                              "x-apifox-orders": [
+                                "EndpointsConfig"
+                              ],
+                              "x-apifox-ignore-properties": []
+                            },
+                            "Platform": {
+                              "type": "object",
+                              "properties": {
+                                "architecture": {
+                                  "type": "string"
+                                },
+                                "os": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "architecture",
+                                "os"
+                              ],
+                              "x-apifox-orders": [
+                                "architecture",
+                                "os"
+                              ],
+                              "x-apifox-ignore-properties": []
+                            },
+                            "ContainerName": {
+                              "type": "string"
+                            },
+                            "Version": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "Config",
+                            "HostConfig",
+                            "NetworkingConfig",
+                            "Platform",
+                            "ContainerName",
+                            "Version"
+                          ],
+                          "x-apifox-orders": [
+                            "Config",
+                            "HostConfig",
+                            "NetworkingConfig",
+                            "Platform",
+                            "ContainerName",
+                            "Version"
+                          ],
+                          "description": "创建信息",
+                          "x-apifox-ignore-properties": []
+                        }
+                      },
+                      "required": [
+                        "info"
+                      ],
+                      "x-apifox-orders": [
+                        "info"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "info": {
+                          "Config": {
+                            "Hostname": "",
+                            "Domainname": "",
+                            "User": "",
+                            "AttachStdin": false,
+                            "AttachStdout": false,
+                            "AttachStderr": false,
+                            "Tty": true,
+                            "OpenStdin": true,
+                            "StdinOnce": false,
+                            "Env": null,
+                            "Cmd": null,
+                            "Image": "nvidia/cuda:10.0-base",
+                            "Volumes": null,
+                            "WorkingDir": "",
+                            "Entrypoint": null,
+                            "OnBuild": null,
+                            "Labels": null
+                          },
+                          "HostConfig": {
+                            "Binds": [
+                              "spill-0:/root/spill-0"
+                            ],
+                            "ContainerIDFile": "",
+                            "LogConfig": {
+                              "Type": "",
+                              "Config": null
+                            },
+                            "NetworkMode": "",
+                            "PortBindings": null,
+                            "RestartPolicy": {
+                              "Name": "",
+                              "MaximumRetryCount": 0
+                            },
+                            "AutoRemove": false,
+                            "VolumeDriver": "",
+                            "VolumesFrom": null,
+                            "ConsoleSize": [
+                              0,
+                              0
+                            ],
+                            "CapAdd": null,
+                            "CapDrop": null,
+                            "CgroupnsMode": "",
+                            "Dns": null,
+                            "DnsOptions": null,
+                            "DnsSearch": null,
+                            "ExtraHosts": null,
+                            "GroupAdd": null,
+                            "IpcMode": "",
+                            "Cgroup": "",
+                            "Links": null,
+                            "OomScoreAdj": 0,
+                            "PidMode": "",
+                            "Privileged": false,
+                            "PublishAllPorts": false,
+                            "ReadonlyRootfs": false,
+                            "SecurityOpt": null,
+                            "UTSMode": "",
+                            "UsernsMode": "",
+                            "ShmSize": 0,
+                            "Isolation": "",
+                            "CpuShares": 0,
+                            "Memory": 0,
+                            "NanoCpus": 0,
+                            "CgroupParent": "",
+                            "BlkioWeight": 0,
+                            "BlkioWeightDevice": null,
+                            "BlkioDeviceReadBps": null,
+                            "BlkioDeviceWriteBps": null,
+                            "BlkioDeviceReadIOps": null,
+                            "BlkioDeviceWriteIOps": null,
+                            "CpuPeriod": 0,
+                            "CpuQuota": 0,
+                            "CpuRealtimePeriod": 0,
+                            "CpuRealtimeRuntime": 0,
+                            "CpusetCpus": "",
+                            "CpusetMems": "",
+                            "Devices": null,
+                            "DeviceCgroupRules": null,
+                            "DeviceRequests": [
+                              {
+                                "Driver": "nvidia",
+                                "Count": 0,
+                                "DeviceIDs": [
+                                  "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce",
+                                  "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31",
+                                  "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68"
+                                ],
+                                "Capabilities": [
+                                  [
+                                    "gpu"
+                                  ]
+                                ],
+                                "Options": null
+                              }
+                            ],
+                            "MemoryReservation": 0,
+                            "MemorySwap": 0,
+                            "MemorySwappiness": null,
+                            "OomKillDisable": null,
+                            "PidsLimit": null,
+                            "Ulimits": null,
+                            "CpuCount": 0,
+                            "CpuPercent": 0,
+                            "IOMaximumIOps": 0,
+                            "IOMaximumBandwidth": 0,
+                            "MaskedPaths": null,
+                            "ReadonlyPaths": null
+                          },
+                          "NetworkingConfig": {
+                            "EndpointsConfig": null
+                          },
+                          "Platform": {
+                            "architecture": "",
+                            "os": ""
+                          },
+                          "ContainerName": "contempt-0",
+                          "Version": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137848629-run"
+      }
+    },
+    "/api/v1/resources/gpus": {
+      "get": {
+        "summary": "查看 GPU 使用状态",
+        "x-apifox-folder": "资源",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "### 查看 GPU 使用情况\n\n描述：key：GPU UUID，  value：占用情况，0 代表未被占用，1 代表已被占用",
+        "tags": [
+          "资源"
         ],
         "parameters": [],
         "responses": {
@@ -764,9 +1518,6 @@
                             "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5": {
                               "type": "integer"
                             },
-                            "GPU-bc85a406-0357-185f-a56c-afb49572bdbe": {
-                              "type": "integer"
-                            },
                             "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce": {
                               "type": "integer"
                             },
@@ -780,31 +1531,29 @@
                             "GPU-36009026-9470-a2e0-73d3-222a63b82e4e",
                             "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d",
                             "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5",
-                            "GPU-bc85a406-0357-185f-a56c-afb49572bdbe",
                             "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce",
                             "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9"
                           ],
+                          "description": "GPU 使用情况",
+                          "x-apifox-ignore-properties": [],
                           "x-apifox-orders": [
                             "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31",
                             "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68",
                             "GPU-36009026-9470-a2e0-73d3-222a63b82e4e",
                             "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d",
                             "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5",
-                            "GPU-bc85a406-0357-185f-a56c-afb49572bdbe",
                             "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce",
                             "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9"
-                          ],
-                          "description": "GPU 使用情况",
-                          "x-apifox-ignore-properties": []
+                          ]
                         }
                       },
                       "required": [
                         "gpuStatus"
                       ],
+                      "x-apifox-ignore-properties": [],
                       "x-apifox-orders": [
                         "gpuStatus"
-                      ],
-                      "x-apifox-ignore-properties": []
+                      ]
                     }
                   },
                   "required": [
@@ -812,12 +1561,12 @@
                     "msg",
                     "data"
                   ],
+                  "x-apifox-ignore-properties": [],
                   "x-apifox-orders": [
                     "code",
                     "msg",
                     "data"
-                  ],
-                  "x-apifox-ignore-properties": []
+                  ]
                 },
                 "examples": {
                   "1": {
@@ -827,12 +1576,11 @@
                       "msg": "success",
                       "data": {
                         "gpuStatus": {
-                          "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31": 0,
+                          "GPU-04adce59-e7fc-19ed-6800-bc09e5f8fa31": 1,
                           "GPU-281d9730-5a26-7c56-12fb-3a3d5a24ab68": 0,
                           "GPU-36009026-9470-a2e0-73d3-222a63b82e4e": 0,
                           "GPU-7a42be89-64fe-5383-c7be-49d199a96b3d": 0,
                           "GPU-82fbe07b-200b-1d4c-4fbe-b0b54db86be5": 0,
-                          "GPU-bc85a406-0357-185f-a56c-afb49572bdbe": 0,
                           "GPU-c6b3ca5f-c1ac-8171-582b-737b70a6bbce": 0,
                           "GPU-dc6d913c-8df4-a9a4-49e6-b82fcba5a6f9": 0
                         }
@@ -1026,6 +1774,148 @@
           }
         },
         "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326941-run"
+      },
+      "get": {
+        "summary": "获取 Volume 信息",
+        "x-apifox-folder": "卷",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "# 获取 Volume 存储在 ETCD 中的创建信息\n> TODO：获取历史版本的创建信息还没有开始开发\n\n例如 name 为 veil 的 Volume，经过一次更新 size 操作，生成了一个新的 Volume：veil-1。\n此时无论你调用接口时传递 veil-0 还是 veil-1 都只会返回最新的 Volume 创建信息。也就是 veil-1。\n",
+        "tags": [
+          "卷"
+        ],
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "description": "Volume 名称",
+            "required": true,
+            "example": " veil-0",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "info": {
+                          "type": "object",
+                          "properties": {
+                            "Opt": {
+                              "type": "object",
+                              "properties": {
+                                "Driver": {
+                                  "type": "string"
+                                },
+                                "DriverOpts": {
+                                  "type": "object",
+                                  "properties": {
+                                    "size": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "required": [
+                                    "size"
+                                  ],
+                                  "x-apifox-orders": [
+                                    "size"
+                                  ],
+                                  "x-apifox-ignore-properties": []
+                                },
+                                "Name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "Driver",
+                                "DriverOpts",
+                                "Name"
+                              ],
+                              "x-apifox-orders": [
+                                "Driver",
+                                "DriverOpts",
+                                "Name"
+                              ],
+                              "x-apifox-ignore-properties": []
+                            },
+                            "Version": {
+                              "type": "integer"
+                            }
+                          },
+                          "required": [
+                            "Opt",
+                            "Version"
+                          ],
+                          "x-apifox-orders": [
+                            "Opt",
+                            "Version"
+                          ],
+                          "description": "创建信息",
+                          "x-apifox-ignore-properties": []
+                        }
+                      },
+                      "required": [
+                        "info"
+                      ],
+                      "x-apifox-orders": [
+                        "info"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "info": {
+                          "Opt": {
+                            "Driver": "local",
+                            "DriverOpts": {
+                              "size": "20GB"
+                            },
+                            "Name": "veil-0"
+                          },
+                          "Version": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137880238-run"
       }
     },
     "/api/v1/volumes/{name}/size": {
@@ -1142,6 +2032,147 @@
           }
         },
         "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137326942-run"
+      }
+    },
+    "/api/v1/detect/gpu": {
+      "get": {
+        "summary": "未命名接口",
+        "x-apifox-folder": "",
+        "x-apifox-status": "developing",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "x-apifox-ignore-properties": [],
+                  "x-apifox-orders": []
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137819937-run"
+      }
+    },
+    "/api/v1/resources/ports": {
+      "get": {
+        "summary": "查看 Port 占用情况",
+        "x-apifox-folder": "资源",
+        "x-apifox-status": "released",
+        "deprecated": false,
+        "description": "### 查看已被使用的端口号",
+        "tags": [
+          "资源"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "integer"
+                    },
+                    "msg": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "portStatus": {
+                          "type": "object",
+                          "properties": {
+                            "StartPort": {
+                              "type": "integer",
+                              "description": "可用的起始端口"
+                            },
+                            "EndPort": {
+                              "type": "integer",
+                              "description": "可用的最大端口"
+                            },
+                            "AvailableCount": {
+                              "type": "integer",
+                              "description": "可用端口的数量"
+                            },
+                            "UsedPortSet": {
+                              "type": "array",
+                              "items": {
+                                "type": "integer"
+                              },
+                              "description": "已被使用的端口"
+                            }
+                          },
+                          "required": [
+                            "StartPort",
+                            "EndPort",
+                            "AvailableCount",
+                            "UsedPortSet"
+                          ],
+                          "x-apifox-orders": [
+                            "StartPort",
+                            "EndPort",
+                            "AvailableCount",
+                            "UsedPortSet"
+                          ],
+                          "x-apifox-ignore-properties": []
+                        }
+                      },
+                      "required": [
+                        "portStatus"
+                      ],
+                      "x-apifox-orders": [
+                        "portStatus"
+                      ],
+                      "x-apifox-ignore-properties": []
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-orders": [
+                    "code",
+                    "msg",
+                    "data"
+                  ],
+                  "x-apifox-ignore-properties": []
+                },
+                "examples": {
+                  "1": {
+                    "summary": "Success",
+                    "value": {
+                      "code": 200,
+                      "msg": "success",
+                      "data": {
+                        "portStatus": {
+                          "StartPort": 40000,
+                          "EndPort": 65535,
+                          "AvailableCount": 25536,
+                          "UsedPortSet": [
+                            40000,
+                            40001
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-run-in-apifox": "https://apifox.com/web/project/3830507/apis/api-137826915-run"
       }
     }
   },

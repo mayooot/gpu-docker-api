@@ -28,38 +28,29 @@ foo-1 来代替 foo-0（foo-0 不会被删除），类似于 K8s 中更新一个
 
 ### 容器（Container）
 
-*
-    - [x] 创建 GPU 容器
-*
-    - [x] 创建无卡容器
-*
-    - [x] 升降容器 GPU 配置
-*
-    - [x] 升降容器 Volume 配置
-*
-    - [x] 停止容器
-*
-    - [x] 重启动容器
-*
-    - [x] 在容器内部执行命令
-*
-    - [x] 删除容器
-*
-    - [x] 保存容器为镜像
+- [x] 创建 GPU 容器
+- [x] 创建无卡容器
+- [x] 升降容器 GPU 配置
+- [x] 升降容器 Volume 配置
+- [x] 停止容器
+- [x] 重启容器
+- [x] 在容器内部执行命令
+- [x] 删除容器
+- [x] 保存容器为镜像
 
 ### 卷（Volume）
 
-*
-    - [x] 创建指定容量大小的 Volume
-*
-    - [x] 删除 Volume
-*
-    - [x] 扩缩容 Volume
+- [x] 创建指定容量大小的 Volume
+- [x] 删除 Volume
+- [x] 扩缩容 Volume
 
 ### GPU
 
-*
-    - [x] 查看 GPU 使用情况
+- [x] 查看 GPU 使用情况
+
+### Port
+
+- [x] 查看已使用的 Ports
 
 ## 快速开始
 
@@ -127,13 +118,18 @@ vim etc/config.yaml
     * 创建 Volume 时生成版本号，默认为 0，当 Volume 被更新后，版本号＋1。
 
   程序关闭后，会将 VersionMap 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
+* gpuScheduler：分配 GPU 资源的调度器，将容器使用 GPU 的占用情况保存到 gpuStatusMap。
+    * gpuStatusMap：
+      维护服务器的 GPU 资源，当程序第一次启动时，调用 detect-gpu 获取全部的 GPU 资源，并初始化 gpuStatusMap，Key 为 GPU 的
+      UUID，Value 为 使用情况，0 代表未占用，1 代表已占用。
 
-* gpuStatusMap：
+      程序关闭后，会将 gpuStatusMap 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
 
-  维护服务器的 GPU 资源，当程序第一次启动时，调用 detect-gpu 获取全部的 GPU 资源，并初始化 gpuStatusMap，Key 为 GPU 的
-  UUID，Value 为 使用情况，0 代表未占用，1 代表已占用。
+* portScheduler：分配 Port 资源的调度器，将容器使用的 Port 资源保存到 usedPortSet。
+    * usedPortSet:
+      维护服务器的 Port 资源，已经被占用的 Port 会被加入到这个 Set。
 
-  程序关闭后，会将 gpuStatusMap 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
+      程序关闭后，会将 usedPortSet 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
 
 * docker：实际创建 Container、Volume等资源的组件，并安装了 NVIDIA Container Toolkit，拥有调度 GPU 的能力。
 
@@ -143,9 +139,9 @@ vim etc/config.yaml
     * /apis/v1/containers
     * /apis/v1/volumes
     * /apis/v1/gpus/gpuStatusMapKey
+    * /apis/v1/ports/usedPortSetKey
     * /apis/v1/versions/containerVersionMapKey
     * /apis/v1/versions/volumeVersionMapKey
-
 
 * dete-gpu：调用 go-nvml 的一个小工具，启动时会提供一个 HTTP 接口用于获取 GPU 信息。
 
