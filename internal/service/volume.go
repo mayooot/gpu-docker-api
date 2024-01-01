@@ -64,7 +64,11 @@ func (vs *VolumeService) createVolume(ctx context.Context, info model.EtcdVolume
 
 	defer func() {
 		if err != nil {
-			vmap.VolumeVersionMap.Set(info.Opt.Name, sync2.AtomicInt64(version.Add(-1)))
+			if version.Get() == 0 {
+				vmap.VolumeVersionMap.Remove(info.Opt.Name)
+			} else {
+				vmap.VolumeVersionMap.Set(info.Opt.Name, sync2.AtomicInt64(version.Add(-1)))
+			}
 		}
 	}()
 

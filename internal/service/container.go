@@ -439,7 +439,11 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 
 	defer func() {
 		if err != nil {
-			vmap.ContainerVersionMap.Set(name, sync2.AtomicInt64(version.Add(-1)))
+			if version.Get() == 0 {
+				vmap.ContainerVersionMap.Remove(name)
+			} else {
+				vmap.ContainerVersionMap.Set(name, sync2.AtomicInt64(version.Add(-1)))
+			}
 		}
 	}()
 
