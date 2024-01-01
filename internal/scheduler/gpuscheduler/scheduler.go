@@ -17,7 +17,8 @@ import (
 const (
 	// 默认的可用GPU 数量
 	defaultAvailableGpuNums = 8
-	// gpuStatusMapKey 用于存储 GPU 使用信息的 key
+
+	// gpuScheduler 存储在 etcd 中的 key
 	gpuStatusMapKey = "gpuStatusMapKey"
 )
 
@@ -36,6 +37,7 @@ func Init(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
+
 	if Scheduler.AvailableGpuNums == 0 || len(Scheduler.GpuStatusMap) == 0 {
 		// 如果没有初始化过
 		Scheduler.AvailableGpuNums = defaultAvailableGpuNums
@@ -119,12 +121,13 @@ func (s *scheduler) serialize() *string {
 }
 
 func initFormEtcd() (s *scheduler, err error) {
-	s = &scheduler{
-		GpuStatusMap: make(map[string]byte),
-	}
 	bytes, err := etcd.Get(etcd.Gpus, gpuStatusMapKey)
 	if err != nil {
 		return s, err
+	}
+
+	s = &scheduler{
+		GpuStatusMap: make(map[string]byte),
 	}
 	if len(bytes) != 0 {
 		err = json.Unmarshal(bytes, &s)

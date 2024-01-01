@@ -16,10 +16,6 @@ type Bind struct {
 	Dest string `json:"dest"`
 }
 
-func (b *Bind) Equal(other *Bind) bool {
-	return b.Src == other.Src && b.Dest == other.Dest
-}
-
 func (b *Bind) Format() string {
 	return fmt.Sprintf("%s:%s", b.Src, b.Dest)
 }

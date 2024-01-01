@@ -11,12 +11,13 @@ import (
 
 var (
 	// ContainerVersionMap 用于追踪容器的版本信息
-	ContainerVersionMap versionMap
+	ContainerVersionMap *versionMap
 	// VolumeVersionMap 用于跟踪 Volume 的版本信息
-	VolumeVersionMap versionMap
+	VolumeVersionMap *versionMap
 )
 
 const (
+	// 存储在 etcd 中的 key
 	containerVersionMapKey = "containerVersionMapKey"
 	volumeVersionMapKey    = "volumeVersionMapKey"
 )
@@ -25,8 +26,8 @@ type versionMap struct {
 	cmap.ConcurrentMap[string, sync2.AtomicInt64]
 }
 
-func newVersionMap() versionMap {
-	return versionMap{cmap.New[sync2.AtomicInt64]()}
+func newVersionMap() *versionMap {
+	return &versionMap{cmap.New[sync2.AtomicInt64]()}
 }
 
 func (vm *versionMap) serialize() *string {
@@ -37,12 +38,12 @@ func (vm *versionMap) serialize() *string {
 
 func Init() error {
 	var err error
-	ContainerVersionMap, err = initVersionMap()
+	ContainerVersionMap, err = initVersionMap(containerVersionMapKey)
 	if err != nil {
 		return err
 	}
 
-	VolumeVersionMap, err = initVersionMap()
+	VolumeVersionMap, err = initVersionMap(volumeVersionMapKey)
 	if err != nil {
 		return err
 	}
@@ -60,12 +61,13 @@ func Close() error {
 	return nil
 }
 
-func initVersionMap() (vm versionMap, err error) {
-	vm = newVersionMap()
-	bytes, err := etcd.Get(etcd.Versions, containerVersionMapKey)
+func initVersionMap(key string) (vm *versionMap, err error) {
+	bytes, err := etcd.Get(etcd.Versions, key)
 	if err != nil {
 		return vm, err
 	}
+
+	vm = newVersionMap()
 	if len(bytes) != 0 {
 		err = json.Unmarshal(bytes, &vm)
 	}

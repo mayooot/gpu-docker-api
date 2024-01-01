@@ -13,43 +13,46 @@ import (
 )
 
 const (
+	// 默认端口范围 [4000, 65535]
 	defaultStartPort   = 40000
 	defaultEndPort     = 65535
-	AvailablePortCount = defaultEndPort - defaultStartPort + 1
-	usedPortSetKey     = "usedPortSetKey"
+	availablePortCount = defaultEndPort - defaultStartPort + 1
+
+	// portScheduler 存储在 etcd 中的 key
+	usedPortSetKey = "usedPortSetKey"
 )
 
 var Scheduler *scheduler
 
-type scheduler struct {
-	sync.RWMutex
+type portParams struct {
 	StartPort      int
 	EndPort        int
 	AvailableCount int
-	UsedPortSet    map[int]struct{}
 }
 
-type Alias struct {
-	StartPort      int
-	EndPort        int
-	AvailableCount int
-	UsedPortSet    []int
+type scheduler struct {
+	sync.RWMutex
+
+	portParams
+	UsedPortSet map[int]struct{}
+}
+
+type alias struct {
+	portParams
+	UsedPortSet []int
 }
 
 // MarshalJSON 重载序列化结构体为 JSON 的方法
-// 如果直接将 scheduler 序列化，UsedPortSet 字段以 map 的形式输出，value为 struct{}{}，而且是乱序的
+// 如果直接将 scheduler 序列化，UsedPortSet 字段以 map 的形式输出，value为 struct{}{}，而且是乱序
 func (s *scheduler) MarshalJSON() ([]byte, error) {
 	onlyKeys := make([]int, 0, len(s.UsedPortSet))
 	for k, _ := range s.UsedPortSet {
 		onlyKeys = append(onlyKeys, k)
 	}
 	sort.Ints(onlyKeys)
-	return json.Marshal(Alias{
-		s.StartPort,
-		s.EndPort,
-		s.AvailableCount,
-		onlyKeys,
-	})
+	return json.Marshal(alias{
+		portParams:  s.portParams,
+		UsedPortSet: onlyKeys})
 }
 
 func Init(cfg *config.Config) error {
@@ -63,7 +66,7 @@ func Init(cfg *config.Config) error {
 		// 如果没有初始化过
 		Scheduler.StartPort = defaultStartPort
 		Scheduler.EndPort = defaultEndPort
-		Scheduler.AvailableCount = AvailablePortCount
+		Scheduler.AvailableCount = availablePortCount
 		if cfg.StartPort >= 0 && cfg.EndPort >= 0 {
 			Scheduler.StartPort = cfg.StartPort
 			Scheduler.EndPort = cfg.EndPort
@@ -143,18 +146,16 @@ func initFormEtcd() (s *scheduler, err error) {
 	if err != nil {
 		return s, err
 	}
-	var alias Alias
+
+	var alias alias
 	if len(bytes) != 0 {
 		err = json.Unmarshal(bytes, &alias)
 	}
 
 	s = &scheduler{
-		StartPort:      alias.StartPort,
-		EndPort:        alias.EndPort,
-		AvailableCount: alias.AvailableCount,
-		UsedPortSet:    make(map[int]struct{}, len(alias.UsedPortSet)),
+		portParams:  alias.portParams,
+		UsedPortSet: make(map[int]struct{}, len(alias.UsedPortSet)),
 	}
-
 	for _, port := range alias.UsedPortSet {
 		s.UsedPortSet[port] = struct{}{}
 	}
