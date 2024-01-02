@@ -195,7 +195,7 @@ And workQueue asynchronous processing in Client-go.
 
 ## Architecture Diagram
 
-![design](docs/design.png)
+![design.png](design.png)
 
 ## Documents
 
