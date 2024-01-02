@@ -48,7 +48,7 @@ cards, and we want it to use 5, calling the interface creates the new container
 foo-1 will be created to replace foo-0 (foo-0 will not be deleted), similar to how updating a Pod in K8s will be a
 rolling replacement.
 
-It's worth noting that the new container doesn't look much different from the old one, except for the parts we specified
+It's worth noting that the new container does not look much different from the old one, except for the parts we specified
 to be updated, and even the software you installed, which will appear in the new container as is. Not to mention, the
 data disk, file storage, environment variables, and port mapping, which looks pretty cool
 😎.
@@ -191,7 +191,7 @@ And workQueue asynchronous processing in Client-go.
     * /apis/v1/versions/containerVersionMapKey
     * /apis/v1/versions/volumeVersionMapKey
 
-* dete-gpu：A small utility that calls go-nvml and provides an HTTP interface at startup to get GPU information.
+* detect-gpu：A small utility that calls go-nvml and provides an HTTP interface at startup to get GPU information.
 
 ## Architecture Diagram
 
