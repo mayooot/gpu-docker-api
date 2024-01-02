@@ -1,9 +1,31 @@
-# gpu-docker-api
+# GPU-Docker-API
+![license](https://img.shields.io/hexpm/l/plug.svg)
 
-## 介绍
+[English](docs%2Fen.md)
 
-使用 Docker Client 调用 NVIDIA Docker 来实现 GPU 容器的业务功能。如升降 GPU 容器的配置、无卡启动容器、扩缩容 Volume
-数据卷。类似于 [AutoDL](https://www.autodl.com/docs/env/) 中关于容器实例的操作。
+# 介绍
+
+使用 Docker Client 调用 NVIDIA Docker 来实现 GPU 容器的业务功能。如升降 GPU 容器的配置、无卡启动容器、扩缩容 Volume 。
+
+类似于 [AutoDL](https://www.autodl.com/docs/env/) 中关于容器实例的操作。
+
+- [GPU-Docker-API](#gpu-docker-api)
+- [介绍](#介绍)
+- [实现的功能](#实现的功能)
+    - [容器](#容器container)
+    - [Volume](#卷volume)
+    - [GPU](#gpu)
+    - [Port](#port)
+- [快速开始](#快速开始)
+    - [API](#api)
+    - [环境准备](#环境准备)
+    - [使用源码构建](#使用源码构建)
+- [架构](#架构)
+    - [组件介绍](#组件介绍)
+    - [架构图](#架构图)
+    - [文档](#文档)
+- [贡献代码](#贡献代码)
+- [Environment](#environment)
 
 首先我必须向你描述，一个 GPU 容器启动时，它的目录应该是怎么样的。如下：
 
@@ -24,9 +46,9 @@ foo-1 来代替 foo-0（foo-0 不会被删除），类似于 K8s 中更新一个
 
 更新Volume 时也是如此。
 
-## 实现的功能
+# 实现的功能
 
-### 容器（Container）
+## 容器（Container）
 
 - [x] 创建 GPU 容器
 - [x] 创建无卡容器
@@ -38,30 +60,30 @@ foo-1 来代替 foo-0（foo-0 不会被删除），类似于 K8s 中更新一个
 - [x] 删除容器
 - [x] 保存容器为镜像
 
-### 卷（Volume）
+## 卷（Volume）
 
 - [x] 创建指定容量大小的 Volume
 - [x] 删除 Volume
 - [x] 扩缩容 Volume
 
-### GPU
+## GPU
 
 - [x] 查看 GPU 使用情况
 
-### Port
+## Port
 
 - [x] 查看已使用的 Ports
 
-## 快速开始
+# 快速开始
 
 [👉点此查看，我的测试环境信息](#Environment)
 
-### API
+## API
 
 你可以通过导入 [gpu-docker-api.openapi.json](api/gpu-docker-api.openapi.json)
 或查阅 [gpu-docker-api-sample-interface.md](api/gpu-docker-api-sample-interface.md)  了解并调用接口。
 
-### 环境准备
+## 环境准备
 
 1. 测试环境已经安装好 NVIDIA 显卡对应的驱动。
 2. 确保你的测试环境已安装 NVIDIA Docker，安装教程：[NVIDIA Docker 安装](https://zhuanlan.zhihu.com/p/361934132)。
@@ -71,8 +93,9 @@ foo-1 来代替 foo-0（foo-0 不会被删除），类似于 K8s 中更新一个
 4. 确保你的测试环境已安装 ETCD V3，安装教程：[ETCD](https://github.com/etcd-io/etcd)。
 5. 克隆并运行 [detect-gpu](https://github.com/mayooot/detect-gpu)。
 
-### 编译项目
+## 使用源码构建
 
+### 构建
 ~~~
 git clone https://github.com/mayooot/gpu-docker-api.git
 cd gpu-docker-api
@@ -91,7 +114,7 @@ vim etc/config.yaml
 ./gpu-docker-api-${your_os}-amd64
 ~~~
 
-## 架构
+# 架构
 
 设计上受到了许多 Kubernetes 的启发和借鉴。
 
@@ -99,7 +122,7 @@ vim etc/config.yaml
 
 以及 Client-go 中的 workQueue 异步处理。
 
-### 组件介绍
+## 组件介绍
 
 * gin：处理 HTTP 请求和接口路由。
 
@@ -145,22 +168,22 @@ vim etc/config.yaml
 
 * dete-gpu：调用 go-nvml 的一个小工具，启动时会提供一个 HTTP 接口用于获取 GPU 信息。
 
-### 架构图
+## 架构图
 
 ![design](docs/design.png)
 
-### 文档
+## 文档
 
 * 容器升降 GPU 资源的实现: [container-gpu-scale.md](docs%2Fcontainer%2Fcontainer-gpu-scale.md)
 * Volume 扩缩容的实现: [volume-size-scale.md](docs%2Fvolume%2Fvolume-size-scale.md)
 
-## 贡献代码
+# 贡献代码
 
 欢迎贡献代码或 issue!
 
 ## Environment
 
-### 开发环境
+## 开发环境
 
 ~~~ 
 $ sw_vers
@@ -175,7 +198,7 @@ $ go version
 go version go1.21.5 darwin/arm64
 ~~~
 
-### 测试环境
+## 测试环境
 
 ~~~
 $ cat /etc/issue
