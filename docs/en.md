@@ -1,14 +1,15 @@
 # GPU-Docker-API
 
 ![license](https://img.shields.io/hexpm/l/plug.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)
 
-[zh-cn](..%2FREADME.md)
+[简体中文](docs%2Fzh-cn.md)
 
 # Overview
 
-Use the Docker Client to invoke NVIDIA Docker to realize the business functions of GPU containers.
+Use the Docker Client to invoke NVIDIA Docker to realize the business functions of GPU container.
 
-For example, lifting and lowering GPU container configurations, starting containers without cards, and scaling up and
+For example, lifting GPU container configurations, starting containers without cards, and scaling up and
 down volume size.
 
 Similar to the operation on container instances in [AutoDL](https://www.autodl.com/docs/env/).
@@ -33,47 +34,54 @@ Similar to the operation on container instances in [AutoDL](https://www.autodl.c
 
 First I have to describe to you what a GPU container's directory should look like when it starts. It is as follows:
 
-| name         | path          | performance           | description                                                                                                                                                                                                                                                                                                                        |
-|--------------|---------------|-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| system disk  | /             | local disk, fast      | Data will not be lost when the container is stopped. Generally system dependencies and Python installers will be under the system disk, which will be preserved when saving the image. The data will be copied to the new container after the container lifts and drops the GPU and Volume configurations.                         | Data Disk | /root
-| Data Disk    | /root/foo-tmp | Local, Fast           | Use Docker Volume to mount, the data will not be lost when the container is stopped, and will not be retained when the image is saved. It is suitable for storing data with high IO requirements for reading and writing. The data will be copied to the new container after the container lifts the GPU and Volume configuration. | File Storage | /root
-| File Storage | /root/foo-fs  | Network Disk, General | Enables synchronized file sharing across multiple containers, such as NFS.                                                                                                                                                                                                                                                         |
+| name         | path          | performance           | description                                                                                                                                                                                                                                                                                                                      |
+|--------------|---------------|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| system disk  | /             | local disk, fast      | Data will not be lost when the container is stopped. Generally system dependencies such as the Python installer are located under the system disk, which will be preserved when saving the image. The data will be copied to the new container after the container lifts the GPU and Volume configurations.                      |
+| Data Disk    | /root/foo-tmp | Local, Fast           | Use Docker Volume to mount, the data will not be lost when the container is stopped, which will be preserved when saving the image. It is suitable for storing data with high IO requirements for reading and writing. The data will be copied to the new container after the container lifts the GPU and Volume configurations. |
+| File Storage | /root/foo-fs  | Network Disk, General | Enables synchronized file sharing across multiple containers, such as NFS.                                                                                                                                                                                                                                                       |
 
-We then discuss update operations (lifting and lowering GPU container configurations, expanding and shrinking Volume
-data volumes, all of these are update operations, and for ease of understanding, we will use the term "update" below
+We then discuss update operations (lifting GPU container configurations, scaling up and down volume size,
+all of these are update operations, and for ease of understanding, we will use the term "update" below
 instead of these specific operations).
 
-When we update a container, a new container is created. For example, if the old container foo-0 was using 3 graphics
-cards, and we want it to use 5, calling the interface creates the new container
-foo-1 will be created to replace foo-0 (foo-0 will not be deleted), similar to how updating a Pod in K8s will be a
-rolling replacement.
+When we update a container, a new container is created.
 
-It's worth noting that the new container does not look much different from the old one, except for the parts we specified
-to be updated, and even the software you installed, which will appear in the new container as is. Not to mention, the
-data disk, file storage, environment variables, and port mapping, which looks pretty cool
-😎.
+For example, if the old container foo-0 was using 3 graphics
+cards, and we want it to use 5 graphics cards, calling the interface creates the new container, foo-1 will be created to
+replace foo-0 (foo-0 will not be deleted), similar to how updating a Pod in K8s will be a rolling replacement.
 
-The same is true when updating Volume.
+It's worth noting that the new container does not look much different from the old one, except for the parts we
+specified
+to be updated, and even the software you installed, which will appear in the new container as is.
+
+Not to mention, the
+data disk, file storage, environment variables, and port mapping.
+
+which looks pretty cool 😎.
+
+The same is true when updating volume.
 
 # Feature
 
 ## Container
 
-- [x] Create GPU Container
-- [x] Create Cardless Container
-- [x] Patch Container GPU Configuration
-- [x] Patch Container Volume Configuration
-- [x] Stop Container
-- [x] Restart Container
+- [x] Create GPU container
+- [x] Create cardless container
+- [x] Patch container GPU configuration
+- [x] Patch container volume configuration
+- [x] Stop container
+- [x] Restart container
 - [x] Execute commands inside the container
-- [x] Delete Container
-- [x] Save container as image
+- [x] Delete container
+- [x] Save container as an image
+- [x] Get container creation information
 
 ## Volume
 
-- [x] Create a Volume of the specified capacity size
-- [x] Delete Volume
-- [x] Expand or reduce Volume
+- [x] Create a volume of the specified capacity size
+- [x] Delete volume
+- [x] Scale up and down volume capacity size
+- [x] Get volume creation information
 
 ## GPU
 
@@ -89,19 +97,18 @@ The same is true when updating Volume.
 
 ## API
 
-You can do this by importing the  [gpu-docker-api.openapi.json](..%2Fapi%2Fgpu-docker-api.openapi.json)
-or check [gpu-docker-api-sample-interface.md](..%2Fapi%2Fgpu-docker-api-sample-interface.md)  to understand and call the
-interface.
+Import [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) to invoke api.
 
 ## Environmental Preparation
 
 1. The test environment has already installed the corresponding drivers for the NVIDIA graphics card.
 2. Make sure you have NVIDIA Docker installed on your test environment, installation
    tutorial: [NVIDIA Docker Installation](https://zhuanlan.zhihu.com/p/361934132).
-3. To support the creation of a Volume of the specified size, ensure that Docker's Storage Driver is Overlay2. Create
+3. To support the creation of a volume of the specified capacity size, ensure that Docker's Storage Driver is Overlay2.
+   Create
    and format a partition as an XFS file system, and use the mounted directory as the
-   Docker Root Dir. 
-   tutorial: [volume-size-scale.md](volume%2Fvolume-size-scale.md)
+   Docker Root Dir.
+   tutorial: [volume-size-scale-en.md](docs%2Fvolume%2Fvolume-size-scale-en.md)
 4. Make sure your test environment has ETCD V3 installed, installation
    tutorial: [ETCD](https://github.com/etcd-io/etcd).
 5. Clone and run [detect-gpu](https://github.com/mayooot/detect-gpu).
@@ -145,44 +152,37 @@ And workQueue asynchronous processing in Client-go.
 
 * workQueue：Asynchronous processing tasks, for example:
 
-    * When a Container/Volume is created, add the created information to the ETCD.
-    * After deleting a Container/Volume, delete the full information about the resource from the ETCD.
-    * After upgrading the GPU/Volume configuration of a Container, copy the data of the old Container to the new
-      Container.
-    * After upgrading the capacity size of a Volume resource, copy the data of the old Volume to the new Volume.
+    * When a container/volume is created, add the created information to the ETCD.
+    * After deleting a container/volume, delete the full information about the resource from the ETCD.
+    * After lifting the GPU/Volume configuration of a container, copy the data of the old container to the new
+      container.
+    * After scaling up and down the capacity size of a Volume resource, copy the data of the old volume to the new
+      volume.
 
 * container/volume VersionMap：
 
-    * Generate version number when creating Container, default is 0, when Container is updated, the version number will
+    * Generate version number when creating a container, default is 0, when container is updated, the version number
+      will
       be +1.
-    * Generate the version number when creating a Volume, default is 0, when the Volume is updated, the version number
+    * Generate the version number when creating a volume, default is 0, when the volume is updated, the version number
+      will
       is +1.
 
-      When the program is closed, the VersionMap is written to the ETCD, and when the program is started again, the data
-      is pulled from the ETCD and initialized.
-* gpuScheduler：A scheduler that allocates GPU resources and saves the container's occupancy using GPUs to gpuStatusMap.
+* gpuScheduler：A scheduler that allocates GPU resources and saves the used GPUs.
     * gpuStatusMap：
       Maintain the GPU resources of the server, when the program starts for the first time, call detect-gpu to get all
-      the GPU resources, and initialize gpuStatusMap, Key is the GPU's
-      Key is the UUID of the GPU, Value is the usage, 0 means unoccupied, 1 means occupied.
+      the GPU resources, and initialize gpuStatusMap, Key is the UUID of GPU, Value is the usage, 0 means used, 1 means
+      unused.
 
-      When the program is closed, the gpuStatusMap is written to the ETCD, and when the program is started again, the
-      data is pulled from the ETCD and initialized.
-
-* portScheduler：The scheduler that allocates Port resources and saves the Port resources used by the container to
-  usedPortSet.
+* portScheduler：A scheduler that allocates Port resources and saves the used Ports.
     * usedPortSet:
-      Maintains the server's port resources. Ports that are already occupied are added to this Set.
+      Maintains the server's port resources. Ports that are already used are added to this Set.
 
-      When the program is closed, the usedPortSet is written to the ETCD, and when the program is started again, the
-      data is pulled from the ETCD and initialized.
+* docker：The component that actually creates the resources such as container, volume, etc. The [NVIDIA
+  Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) in
+  order to schedule GPUs.
 
-* docker：The component that actually creates the resources such as Container, Volume, etc. and installs the NVIDIA
-  Container Toolkit with the ability to schedule GPUs.
-
-* etcd：Holds the full amount of creation information for the Container/Volume, as well as generating Version fields such
-  as mod_revision for rolling back the historical version of the resource. The resources stored in the ETCD
-  The resources stored in the ETCD are as follows:
+* etcd：Save the container/volume creation information. For example:
 
     * /apis/v1/containers
     * /apis/v1/volumes
@@ -191,17 +191,17 @@ And workQueue asynchronous processing in Client-go.
     * /apis/v1/versions/containerVersionMapKey
     * /apis/v1/versions/volumeVersionMapKey
 
-* detect-gpu：A small utility that calls go-nvml and provides an HTTP interface at startup to get GPU information.
+* detect-gpu：A simple HTTP server that calls [go-nvml](https://github.com/NVIDIA/go-nvml) to get the GPU of the host
+  computer.
 
 ## Architecture Diagram
 
-![design.png](design.png)
+![design.png](docs%2Fdesign.png)
 
 ## Documents
 
-* Implementation of the container lifting GPU
-  resources: [container-gpu-scale.md](container%2Fcontainer-gpu-scale.md)
-* Volume expansion and contraction implementation: [volume-size-scale.md](volume%2Fvolume-size-scale.md)
+* [container-gpu-scale.md](docs%2Fcontainer%2Fcontainer-gpu-scale.md)
+* [volume-size-scale-en.md](docs%2Fvolume%2Fvolume-size-scale-en.md)
 
 # Contribute
 
@@ -362,4 +362,3 @@ Sat Dec  9 09:04:06 2023
 |    4   N/A  N/A    ******      C   ******                            *****MiB |
 +-----------------------------------------------------------------------------+
 ~~~
-
