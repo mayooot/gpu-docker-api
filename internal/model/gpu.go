@@ -14,14 +14,14 @@ type ProcessInfo struct {
 }
 
 type GpuInfo struct {
-	UUID                        string        `json:"UUID"`
+	Index                       int           `json:"index"`
+	UUID                        string        `json:"uuid"`
 	Name                        string        `json:"name"`
 	MemoryInfo                  Memory        `json:"memoryInfo"`
 	PowerUsage                  uint32        `json:"powerUsage"`
 	PowerState                  int32         `json:"powerState"`
 	PowerManagementDefaultLimit uint32        `json:"powerManagementDefaultLimit"`
-	InfoImageVersion            string        `json:"infoImageVersion"`
-	InforomImageVersion         string        `json:"inforomImageVersion"`
+	InformImageVersion          string        `json:"informImageVersion"`
 	DriverVersion               string        `json:"systemGetDriverVersion"`
 	CUDADriverVersion           int           `json:"systemGetCudaDriverVersion"`
 	GraphicsRunningProcesses    []ProcessInfo `json:"tGraphicsRunningProcesses"`
