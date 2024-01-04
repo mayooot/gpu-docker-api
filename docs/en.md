@@ -3,7 +3,7 @@
 ![license](https://img.shields.io/hexpm/l/plug.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)
 
-[简体中文](docs%2Fzh-cn.md)
+[简体中文](zh-cn.md)
 
 # Overview
 
@@ -97,7 +97,7 @@ The same is true when updating volume.
 
 ## API
 
-Import [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) to invoke api.
+Import [gpu-docker-api.openapi.json](..%2Fapi%2Fgpu-docker-api.openapi.json) to invoke api.
 
 ## Environmental Preparation
 
@@ -108,7 +108,7 @@ Import [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) to invok
    Create
    and format a partition as an XFS file system, and use the mounted directory as the
    Docker Root Dir.
-   tutorial: [volume-size-scale-en.md](docs%2Fvolume%2Fvolume-size-scale-en.md)
+   tutorial: [volume-size-scale-en.md](volume%2Fvolume-size-scale-en.md)
 4. Make sure your test environment has ETCD V3 installed, installation
    tutorial: [ETCD](https://github.com/etcd-io/etcd).
 5. Clone and run [detect-gpu](https://github.com/mayooot/detect-gpu).
@@ -196,12 +196,12 @@ And workQueue asynchronous processing in Client-go.
 
 ## Architecture Diagram
 
-![design.png](docs%2Fdesign.png)
+![design.png](design.png)
 
 ## Documents
 
-* [container-gpu-scale.md](docs%2Fcontainer%2Fcontainer-gpu-scale.md)
-* [volume-size-scale-en.md](docs%2Fvolume%2Fvolume-size-scale-en.md)
+* [container-gpu-scale.md](container%2Fcontainer-gpu-scale.md)
+* [volume-size-scale-en.md](volume%2Fvolume-size-scale-en.md)
 
 # Contribute
 
