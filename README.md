@@ -1,163 +1,188 @@
 # GPU-Docker-API
+
 ![license](https://img.shields.io/hexpm/l/plug.svg)
+[![Go Report Card](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)
 
-[English](docs%2Fen.md)
+[简体中文](docs%2Fzh-cn.md)
 
-# 介绍
+# Overview
 
-使用 Docker Client 调用 NVIDIA Docker 来实现 GPU 容器的业务功能。如升降 GPU 容器的配置、无卡启动容器、扩缩容 Volume 。
+Use the Docker Client to invoke NVIDIA Docker to realize the business functions of GPU container.
 
-类似于 [AutoDL](https://www.autodl.com/docs/env/) 中关于容器实例的操作。
+For example, lifting GPU container configurations, starting containers without cards, and scaling up and
+down volume size.
+
+Similar to the operation on container instances in [AutoDL](https://www.autodl.com/docs/env/).
 
 - [GPU-Docker-API](#gpu-docker-api)
-- [介绍](#介绍)
-- [实现的功能](#实现的功能)
-    - [容器](#容器container)
-    - [Volume](#卷volume)
+- [Overview](#overview)
+- [Feature](#feature)
+    - [Container](#container)
+    - [Volume](#volume)
     - [GPU](#gpu)
     - [Port](#port)
-- [快速开始](#快速开始)
+- [Quick Start](#quick-start)
     - [API](#api)
-    - [环境准备](#环境准备)
-    - [使用源码构建](#使用源码构建)
-- [架构](#架构)
-    - [组件介绍](#组件介绍)
-    - [架构图](#架构图)
-    - [文档](#文档)
-- [贡献代码](#贡献代码)
+    - [Environmental Preparation](#environmental-preparation)
+    - [Build from Source](#build-from-source)
+- [Architecture](#architecture)
+    - [Component Introduction](#component-introduction)
+    - [Architecture Diagram](#architecture-diagram)
+    - [Documents](#documents)
+- [Contribute](#contribute)
 - [Environment](#environment)
 
-首先我必须向你描述，一个 GPU 容器启动时，它的目录应该是怎么样的。如下：
+First I have to describe to you what a GPU container's directory should look like when it starts. It is as follows:
 
-| 名称   | 路径            | 性能     | 说明                                                                                            |
-|------|---------------|--------|-----------------------------------------------------------------------------------------------|
-| 系统盘  | /             | 本地盘，快  | 容器停止后数据不会丢失。一般系统依赖和 Python 安装包都会在系统盘下，保存镜像时会保留这些数据。容器升降 GPU、Volume 配置后，数据会拷贝到新容器。             |
-| 数据盘  | /root/foo-tmp | 本地盘，快  | 使用 Docker Volume 挂载，容器停止后数据不会丢失，保存镜像时不会保留这些数据。适合存放读写 IO 要求高的数据。容器升降 GPU、Volume 配置后，数据会拷贝到新容器。 |
-| 文件存储 | /root/foo-fs  | 网络盘，一般 | 可以实现多个容器文件同步共享，例如 NFS。                                                                        |
+| name         | path          | performance           | description                                                                                                                                                                                                                                                                                                                      |
+|--------------|---------------|-----------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| system disk  | /             | local disk, fast      | Data will not be lost when the container is stopped. Generally system dependencies such as the Python installer are located under the system disk, which will be preserved when saving the image. The data will be copied to the new container after the container lifts the GPU and Volume configurations.                      |
+| Data Disk    | /root/foo-tmp | Local, Fast           | Use Docker Volume to mount, the data will not be lost when the container is stopped, which will be preserved when saving the image. It is suitable for storing data with high IO requirements for reading and writing. The data will be copied to the new container after the container lifts the GPU and Volume configurations. |
+| File Storage | /root/foo-fs  | Network Disk, General | Enables synchronized file sharing across multiple containers, such as NFS.                                                                                                                                                                                                                                                       |
 
-然后我们来讨论一下更新操作（升降 GPU 容器的配置、扩缩容 Volume 数据卷，这些都属于更新操作，为了方便理解，下面将使用 "更新"
-来代替这些具体的操作）。
+We then discuss update operations (lifting GPU container configurations, scaling up and down volume size,
+all of these are update operations, and for ease of understanding, we will use the term "update" below
+instead of these specific operations).
 
-当我们更新一个容器时，会创建一个新的容器，例如旧的容器 foo-0 使用了 3 张显卡，我们想让它使用 5 张，调用接口后就会创建新的容器
-foo-1 来代替 foo-0（foo-0 不会被删除），类似于 K8s 中更新一个 Pod，会滚动替换一样。
+When we update a container, a new container is created.
 
-值得注意的是，新容器看起来和旧容器没什么不同，除了我们指定要更新的部分，甚至你安装的软件，都会原封不动的出现在新容器中。更不用说，数据盘、文件存储、环境变量、端口映射了，这看起来很酷
-😎。
+For example, if the old container foo-0 was using 3 graphics
+cards, and we want it to use 5 graphics cards, calling the interface creates the new container, foo-1 will be created to
+replace foo-0 (foo-0 will not be deleted), similar to how updating a Pod in K8s will be a rolling replacement.
 
-更新Volume 时也是如此。
+It's worth noting that the new container does not look much different from the old one, except for the parts we
+specified
+to be updated, and even the software you installed, which will appear in the new container as is.
 
-# 实现的功能
+Not to mention, the
+data disk, file storage, environment variables, and port mapping.
 
-## 容器（Container）
+which looks pretty cool 😎.
 
-- [x] 创建 GPU 容器
-- [x] 创建无卡容器
-- [x] 升降容器 GPU 配置
-- [x] 升降容器 Volume 配置
-- [x] 停止容器
-- [x] 重启容器
-- [x] 在容器内部执行命令
-- [x] 删除容器
-- [x] 保存容器为镜像
+The same is true when updating volume.
 
-## 卷（Volume）
+# Feature
 
-- [x] 创建指定容量大小的 Volume
-- [x] 删除 Volume
-- [x] 扩缩容 Volume
+## Container
+
+- [x] Create GPU container
+- [x] Create cardless container
+- [x] Patch container GPU configuration
+- [x] Patch container volume configuration
+- [x] Stop container
+- [x] Restart container
+- [x] Execute commands inside the container
+- [x] Delete container
+- [x] Save container as an image
+- [x] Get container creation information
+
+## Volume
+
+- [x] Create a volume of the specified capacity size
+- [x] Delete volume
+- [x] Scale up and down volume capacity size
+- [x] Get volume creation information
 
 ## GPU
 
-- [x] 查看 GPU 使用情况
+- [x] View GPU Usage
 
 ## Port
 
-- [x] 查看已使用的 Ports
+- [x] View Used Ports
 
-# 快速开始
+# Quick Start
 
-[👉点此查看，我的测试环境信息](#Environment)
+[👉 Click here to see, my environment](#Environment)
 
 ## API
 
-你可以通过导入 [gpu-docker-api.openapi.json](api/gpu-docker-api.openapi.json)
-或查阅 [gpu-docker-api-sample-interface.md](api/gpu-docker-api-sample-interface.md)  了解并调用接口。
+Import [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) to invoke api.
 
-## 环境准备
+## Environmental Preparation
 
-1. 测试环境已经安装好 NVIDIA 显卡对应的驱动。
-2. 确保你的测试环境已安装 NVIDIA Docker，安装教程：[NVIDIA Docker 安装](https://zhuanlan.zhihu.com/p/361934132)。
-3. 为支持创建指定大小的 Volume，请确保 Docker 的 Storage Driver 为 Overlay2。创建并格式化一个分区为 XFS 文件系统，将挂载后的目录作为
-   Docker Root Dir。
-   详细说明：[volume-size-scale.md](docs%2Fvolume%2Fvolume-size-scale.md)
-4. 确保你的测试环境已安装 ETCD V3，安装教程：[ETCD](https://github.com/etcd-io/etcd)。
-5. 克隆并运行 [detect-gpu](https://github.com/mayooot/detect-gpu)。
+1. The test environment has already installed the corresponding drivers for the NVIDIA graphics card.
+2. Make sure you have NVIDIA Docker installed on your test environment, installation
+   tutorial: [NVIDIA Docker Installation](https://zhuanlan.zhihu.com/p/361934132).
+3. To support the creation of a volume of the specified capacity size, ensure that Docker's Storage Driver is Overlay2.
+   Create
+   and format a partition as an XFS file system, and use the mounted directory as the
+   Docker Root Dir.
+   tutorial: [volume-size-scale-en.md](docs%2Fvolume%2Fvolume-size-scale-en.md)
+4. Make sure your test environment has ETCD V3 installed, installation
+   tutorial: [ETCD](https://github.com/etcd-io/etcd).
+5. Clone and run [detect-gpu](https://github.com/mayooot/detect-gpu).
 
-## 使用源码构建
+## Build from source
 
-### 构建
+### Build
+
 ~~~
 git clone https://github.com/mayooot/gpu-docker-api.git
 cd gpu-docker-api
 make build
 ~~~
 
-### 修改配置文件（可选）
+### Modify configuration file (optional)
 
 ~~~
 vim etc/config.yaml
 ~~~
 
-### 运行项目
+### Run
 
 ~~~
 ./gpu-docker-api-${your_os}-amd64
 ~~~
 
-# 架构
+# Architecture
 
-设计上受到了许多 Kubernetes 的启发和借鉴。
+The design is inspired by and borrows a lot from Kubernetes.
 
-比如 K8s 将会资源（Pod、Deployment 等）的全量信息添加到 ETCD 中，然后使用 ETCD 的版本号进行回滚。
+For example, K8s adds full information about resources (Pods, Deployment, etc.) to the ETCD and then uses the ETCD
+version number for rollback.
 
-以及 Client-go 中的 workQueue 异步处理。
+And workQueue asynchronous processing in Client-go.
 
-## 组件介绍
+## Component Introduction
 
-* gin：处理 HTTP 请求和接口路由。
+* gin：Handles HTTP requests and interface routing.
 
-* docker-client：和服务器的 Docker 交互。
+* docker-client：Docker interaction with the server.
 
-* workQueue：异步处理任务，例如：
+* workQueue：Asynchronous processing tasks, for example:
 
-    * 创建 Container/Volume 后，将创建的全量信息添加到 ETCD。
-    * 删除 Container/Volume 后，删除 ETCD 中关于资源的全量信息。
-    * 升降 Container 的 GPU/Volume 配置后，将旧 Container 的数据拷贝到新 Container 中。
-    * 升降 Volume 资源的容量大小后，将旧 Volume 的数据拷贝到新的 Volume 中。
+    * When a container/volume is created, add the created information to the ETCD.
+    * After deleting a container/volume, delete the full information about the resource from the ETCD.
+    * After lifting the GPU/Volume configuration of a container, copy the data of the old container to the new
+      container.
+    * After scaling up and down the capacity size of a Volume resource, copy the data of the old volume to the new
+      volume.
 
 * container/volume VersionMap：
 
-    * 创建 Container 时生成版本号，默认为 0，当 Container 被更新后，版本号＋1。
-    * 创建 Volume 时生成版本号，默认为 0，当 Volume 被更新后，版本号＋1。
+    * Generate version number when creating a container, default is 0, when container is updated, the version number
+      will
+      be +1.
+    * Generate the version number when creating a volume, default is 0, when the volume is updated, the version number
+      will
+      is +1.
 
-  程序关闭后，会将 VersionMap 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
-* gpuScheduler：分配 GPU 资源的调度器，将容器使用 GPU 的占用情况保存到 gpuStatusMap。
+* gpuScheduler：A scheduler that allocates GPU resources and saves the used GPUs.
     * gpuStatusMap：
-      维护服务器的 GPU 资源，当程序第一次启动时，调用 detect-gpu 获取全部的 GPU 资源，并初始化 gpuStatusMap，Key 为 GPU 的
-      UUID，Value 为 使用情况，0 代表未占用，1 代表已占用。
+      Maintain the GPU resources of the server, when the program starts for the first time, call detect-gpu to get all
+      the GPU resources, and initialize gpuStatusMap, Key is the UUID of GPU, Value is the usage, 0 means used, 1 means
+      unused.
 
-      程序关闭后，会将 gpuStatusMap 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
-
-* portScheduler：分配 Port 资源的调度器，将容器使用的 Port 资源保存到 usedPortSet。
+* portScheduler：A scheduler that allocates Port resources and saves the used Ports.
     * usedPortSet:
-      维护服务器的 Port 资源，已经被占用的 Port 会被加入到这个 Set。
+      Maintains the server's port resources. Ports that are already used are added to this Set.
 
-      程序关闭后，会将 usedPortSet 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
+* docker：The component that actually creates the resources such as container, volume, etc. The [NVIDIA
+  Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) in
+  order to schedule GPUs.
 
-* docker：实际创建 Container、Volume等资源的组件，并安装了 NVIDIA Container Toolkit，拥有调度 GPU 的能力。
-
-* etcd：保存 Container/Volume的全量创建信息，以及生成 mod_revision 等 Version 字段用于回滚资源的历史版本。存储在 ETCD
-  中资源如下：
+* etcd：Save the container/volume creation information. For example:
 
     * /apis/v1/containers
     * /apis/v1/volumes
@@ -166,24 +191,25 @@ vim etc/config.yaml
     * /apis/v1/versions/containerVersionMapKey
     * /apis/v1/versions/volumeVersionMapKey
 
-* dete-gpu：调用 go-nvml 的一个小工具，启动时会提供一个 HTTP 接口用于获取 GPU 信息。
+* detect-gpu：A simple HTTP server that calls [go-nvml](https://github.com/NVIDIA/go-nvml) to get the GPU of the host
+  computer.
 
-## 架构图
+## Architecture Diagram
 
-![design](docs/design.png)
+![design.png](docs%2Fdesign.png)
 
-## 文档
+## Documents
 
-* 容器升降 GPU 资源的实现: [container-gpu-scale.md](docs%2Fcontainer%2Fcontainer-gpu-scale.md)
-* Volume 扩缩容的实现: [volume-size-scale.md](docs%2Fvolume%2Fvolume-size-scale.md)
+* [container-gpu-scale.md](docs%2Fcontainer%2Fcontainer-gpu-scale.md)
+* [volume-size-scale-en.md](docs%2Fvolume%2Fvolume-size-scale-en.md)
 
-# 贡献代码
+# Contribute
 
-欢迎贡献代码或 issue!
+Feel free to open issues and pull requests. Any feedback is highly appreciated!
 
-## Environment
+# Environment
 
-## 开发环境
+## Development Environment
 
 ~~~ 
 $ sw_vers
@@ -198,7 +224,7 @@ $ go version
 go version go1.21.5 darwin/arm64
 ~~~
 
-## 测试环境
+## Test Environment
 
 ~~~
 $ cat /etc/issue
