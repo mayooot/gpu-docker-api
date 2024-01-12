@@ -4,6 +4,8 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)
 
 [简体中文](docs%2Fzh-cn.md)
+> ⚠️注意：中文文档已经过期，请使用英文文档。
+>
 
 # Overview
 
@@ -22,9 +24,12 @@ Similar to the operation on container instances in [AutoDL](https://www.autodl.c
     - [GPU](#gpu)
     - [Port](#port)
 - [Quick Start](#quick-start)
-    - [API](#api)
+    - [Import API](#import-api)
     - [Environmental Preparation](#environmental-preparation)
-    - [Build from Source](#build-from-source)
+    - [Build From Source](#build-from-source)
+    - [Download From Release](#download-from-release)
+    - [Config File](#config-file)
+    - [Run](#run)
 - [Architecture](#architecture)
     - [Component Introduction](#component-introduction)
     - [Architecture Diagram](#architecture-diagram)
@@ -95,7 +100,7 @@ The same is true when updating volume.
 
 [👉 Click here to see, my environment](#Environment)
 
-## API
+## Import API
 
 Import [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) to invoke api.
 
@@ -113,23 +118,41 @@ Import [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) to invok
    tutorial: [ETCD](https://github.com/etcd-io/etcd).
 5. Clone and run [detect-gpu](https://github.com/mayooot/detect-gpu).
 
-## Build from source
-
-### Build
+## Build From Source
 
 ~~~
-git clone https://github.com/mayooot/gpu-docker-api.git
-cd gpu-docker-api
-make build
+$ git clone https://github.com/mayooot/gpu-docker-api.git
+$ cd gpu-docker-api
+$ make build
 ~~~
 
-### Modify configuration file (optional)
+## Download From Release
+[release](https://github.com/mayooot/gpu-docker-api/releases)
+
+## Config File
+
+If you download the executable file from [release](https://github.com/mayooot/gpu-docker-api/releases),
+you should download `config.toml` by hand and create the `etc` directory.
+
+The directory structure is as follows:
+
+~~~
+$ tree
+.
+├── etc
+│   └── config.toml
+└── gpu-docker-api-linux-amd64
+
+1 directory, 2 files
+~~~
+
+Then change it the way you want it.
 
 ~~~
 vim etc/config.yaml
 ~~~
 
-### Run
+## Run
 
 ~~~
 ./gpu-docker-api-${your_os}-amd64
