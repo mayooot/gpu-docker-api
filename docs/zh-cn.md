@@ -7,7 +7,7 @@
 
 # 介绍
 
-使用 Docker Client 调用 NVIDIA Docker 来实现 GPU 容器的业务功能。如升降 GPU 容器的配置、无卡启动容器、扩缩容 Volume 。
+使用 Docker 客户端调用 NVIDIA Docker 实现 GPU 容器的业务功能。例如，提升 GPU 容器配置、启动无卡容器、放大和缩小卷大小。
 
 类似于 [AutoDL](https://www.autodl.com/docs/env/) 中关于容器实例的操作。
 
@@ -22,6 +22,9 @@
     - [API](#api)
     - [环境准备](#环境准备)
     - [使用源码构建](#使用源码构建)
+    - [下载发布版本](#下载发布版本)
+    - [配置文件](#配置文件)
+    - [运行](#运行)
 - [架构](#架构)
     - [组件介绍](#组件介绍)
     - [架构图](#架构图)
@@ -29,7 +32,7 @@
 - [贡献代码](#贡献代码)
 - [Environment](#environment)
 
-首先我必须向你描述，一个 GPU 容器启动时，它的目录应该是怎么样的。如下：
+首先我需要描述 GPU 容器在启动时的目录结构应该是什么样的。如下：
 
 | 名称   | 路径            | 性能     | 说明                                                                                            |
 |------|---------------|--------|-----------------------------------------------------------------------------------------------|
@@ -37,16 +40,19 @@
 | 数据盘  | /root/foo-tmp | 本地盘，快  | 使用 Docker Volume 挂载，容器停止后数据不会丢失，保存镜像时不会保留这些数据。适合存放读写 IO 要求高的数据。容器升降 GPU、Volume 配置后，数据会拷贝到新容器。 |
 | 文件存储 | /root/foo-fs  | 网络盘，一般 | 可以实现多个容器文件同步共享，例如 NFS。                                                                        |
 
-然后我们来讨论一下更新操作（升降 GPU 容器的配置、扩缩容 Volume 数据卷，这些都属于更新操作，为了方便理解，下面将使用 "更新"
-来代替这些具体的操作）。
+接下来我们讨论更新操作（提升 GPU 容器配置、放大和缩小卷大小，所有这些都是更新操作，为了便于理解，我们将使用“更新”一词而不是这些具体的操作）。
 
-当我们更新一个容器时，会创建一个新的容器，例如旧的容器 foo-0 使用了 3 张显卡，我们想让它使用 5 张，调用接口后就会创建新的容器
-foo-1 来代替 foo-0（foo-0 不会被删除），类似于 K8s 中更新一个 Pod，会滚动替换一样。
+当我们更新一个容器时，会创建一个新的容器。
 
-值得注意的是，新容器看起来和旧容器没什么不同，除了我们指定要更新的部分，甚至你安装的软件，都会原封不动的出现在新容器中。更不用说，数据盘、文件存储、环境变量、端口映射了，这看起来很酷
-😎。
+例如，如果旧容器 foo-0 使用了 3 个图形卡，我们想让它使用 5 个图形卡，调用接口创建新容器，foo-1 将被创建以替换 foo-0（foo-0 不会被删除），类似于在 K8s 中更新 Pod 会进行滚动替换。
 
-更新Volume 时也是如此。
+值得注意的是，新容器与旧容器看起来没什么不同，除了我们指定要更新的部分，甚至你安装的软件，也会原样出现在新容器中。
+
+更不用说，数据盘、文件存储、环境变量和端口映射了。
+
+看起来相当酷 😎。
+
+更新卷时也是如此。
 
 # 实现的功能
 
@@ -61,12 +67,14 @@ foo-1 来代替 foo-0（foo-0 不会被删除），类似于 K8s 中更新一个
 - [x] 在容器内部执行命令
 - [x] 删除容器
 - [x] 保存容器为镜像
+- [x] 获取容器创建信息
 
 ## 卷（Volume）
 
 - [x] 创建指定容量大小的 Volume
 - [x] 删除 Volume
 - [x] 扩缩容 Volume
+- [x] 获取卷创建信息
 
 ## GPU
 
@@ -82,23 +90,17 @@ foo-1 来代替 foo-0（foo-0 不会被删除），类似于 K8s 中更新一个
 
 ## API
 
-你可以通过导入 [gpu-docker-api.openapi.json](..%2Fapi%2Fgpu-docker-api.openapi.json)
-或查阅 [gpu-docker-api-sample-interface.md](..%2Fapi%2Fgpu-docker-api-sample-interface.md)
-了解并调用接口。
+导入 [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) 以调用 api。
 
 ## 环境准备
 
-1. 测试环境已经安装好 NVIDIA 显卡对应的驱动。
-2. 确保你的测试环境已安装 NVIDIA Docker，安装教程：[NVIDIA Docker 安装](https://zhuanlan.zhihu.com/p/361934132)。
-3. 为支持创建指定大小的 Volume，请确保 Docker 的 Storage Driver 为 Overlay2。创建并格式化一个分区为 XFS 文件系统，将挂载后的目录作为
-   Docker Root Dir。
-   详细说明：[volume-size-scale.md](volume%2Fvolume-size-scale.md)
-4. 确保你的测试环境已安装 ETCD V3，安装教程：[ETCD](https://github.com/etcd-io/etcd)。
-5. 克隆并运行 [detect-gpu](https://github.com/mayooot/detect-gpu)。
+1. 测试环境已经安装了NVIDIA显卡的相应驱动程序。
+2. 确保你的测试环境上安装了[NVIDIA Docker Installation](https://zhuanlan.zhihu.com/p/361934132)。
+3. 为了支持创建指定容量大小的卷，确保Docker的存储驱动是Overlay2。创建并格式化一个分区为XFS文件系统，并使用挂载的目录作为Docker Root Dir。教程：[volume-size-scale-en.md](https://github.com/mayooot/gpu-docker-api/blob/main/docs%2Fvolume%2Fvolume-size-scale-en.md)
+4. 确保你的测试环境安装了ETCD V3，安装教程：[ETCD](https://github.com/etcd-io/etcd)。
+5. 克隆并运行 [detect-gpu](https://github.com/mayooot/detect-gpu)。
 
 ## 使用源码构建
-
-### 构建
 
 ~~~
 git clone https://github.com/mayooot/gpu-docker-api.git
@@ -106,13 +108,33 @@ cd gpu-docker-api
 make build
 ~~~
 
-### 修改配置文件（可选）
+## 下载发布版本
+
+[release](https://github.com/mayooot/gpu-docker-api/releases)
+
+## 配置文件
+
+如果您从 发布版 下载了可执行文件，您应该手动下载 config.toml 并创建 etc 目录。
+
+目录结构如下：
+
+~~~
+$ tree
+.
+├── etc
+│   └── config.toml
+└── gpu-docker-api-linux-amd64
+
+1 目录，2 文件
+~~~
+
+然后按照您想要的方式进行更改。
 
 ~~~
 vim etc/config.yaml
 ~~~
 
-### 运行项目
+## 运行
 
 ~~~
 ./gpu-docker-api-${your_os}-amd64
@@ -144,21 +166,17 @@ vim etc/config.yaml
     * 创建 Container 时生成版本号，默认为 0，当 Container 被更新后，版本号＋1。
     * 创建 Volume 时生成版本号，默认为 0，当 Volume 被更新后，版本号＋1。
 
-  程序关闭后，会将 VersionMap 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
 * gpuScheduler：分配 GPU 资源的调度器，将容器使用 GPU 的占用情况保存到 gpuStatusMap。
     * gpuStatusMap：
       维护服务器的 GPU 资源，当程序第一次启动时，调用 detect-gpu 获取全部的 GPU 资源，并初始化 gpuStatusMap，Key 为 GPU 的
       UUID，Value 为 使用情况，0 代表未占用，1 代表已占用。
 
-      程序关闭后，会将 gpuStatusMap 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
-
 * portScheduler：分配 Port 资源的调度器，将容器使用的 Port 资源保存到 usedPortSet。
     * usedPortSet:
-      维护服务器的 Port 资源，已经被占用的 Port 会被加入到这个 Set。
+      维护服务器的端口资源。已经使用的端口将被添加到这个 Set 中。。
 
-      程序关闭后，会将 usedPortSet 写入 ETCD，当程序再次启动时，从 ETCD 中拉取数据并初始化。
-
-* docker：实际创建 Container、Volume等资源的组件，并安装了 NVIDIA Container Toolkit，拥有调度 GPU 的能力。
+* docker：实际创建资源（如容器、卷等）的组件。为了调度 GPU，需要 [NVIDIA
+  Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) 容器工具包。
 
 * etcd：保存 Container/Volume的全量创建信息，以及生成 mod_revision 等 Version 字段用于回滚资源的历史版本。存储在 ETCD
   中资源如下：
