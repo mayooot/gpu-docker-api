@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)
 
 [简体中文](docs%2Fzh-cn.md)
-> ⚠️注意：中文文档更新可能落后于英文文档，请以英文文档为准。
+> ⚠️注意：中文文档可能落后于英文文档，请以英文文档为准。
 >
 
 # Overview
