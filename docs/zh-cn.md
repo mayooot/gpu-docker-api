@@ -7,7 +7,7 @@
 
 # 介绍
 
-使用 Docker 客户端调用 NVIDIA Docker 实现 GPU 容器的业务功能。例如，提升 GPU 容器配置、启动无卡容器、放大和缩小卷大小。
+使用 Docker 客户端调用 NVIDIA Docker 实现 GPU 容器的业务功能。例如，提升 GPU 容器配置、启动无卡容器、扩缩容卷大小。
 
 类似于 [AutoDL](https://www.autodl.com/docs/env/) 中关于容器实例的操作。
 
@@ -44,7 +44,8 @@
 
 当我们更新一个容器时，会创建一个新的容器。
 
-例如，如果旧容器 foo-0 使用了 3 个图形卡，我们想让它使用 5 个图形卡，调用接口创建新容器，foo-1 将被创建以替换 foo-0（foo-0 不会被删除），类似于在 K8s 中更新 Pod 会进行滚动替换。
+例如，如果旧容器 foo-0 使用了 3 个图形卡，我们想让它使用 5 个图形卡，调用接口创建新容器，foo-1 将被创建以替换 foo-0（foo-0
+不会被删除），类似于在 K8s 中更新 Pod 会进行滚动替换。
 
 值得注意的是，新容器与旧容器看起来没什么不同，除了我们指定要更新的部分，甚至你安装的软件，也会原样出现在新容器中。
 
@@ -96,9 +97,10 @@
 
 1. 测试环境已经安装了NVIDIA显卡的相应驱动程序。
 2. 确保你的测试环境上安装了[NVIDIA Docker Installation](https://zhuanlan.zhihu.com/p/361934132)。
-3. 为了支持创建指定容量大小的卷，确保Docker的存储驱动是Overlay2。创建并格式化一个分区为XFS文件系统，并使用挂载的目录作为Docker Root Dir。教程：[volume-size-scale-en.md](https://github.com/mayooot/gpu-docker-api/blob/main/docs%2Fvolume%2Fvolume-size-scale-en.md)
+3. 为了支持创建指定容量大小的卷，确保Docker的存储驱动是Overlay2。创建并格式化一个分区为XFS文件系统，并使用挂载的目录作为Docker
+   Root
+   Dir。教程：[volume-size-scale-en.md](https://github.com/mayooot/gpu-docker-api/blob/main/docs%2Fvolume%2Fvolume-size-scale-en.md)
 4. 确保你的测试环境安装了ETCD V3，安装教程：[ETCD](https://github.com/etcd-io/etcd)。
-5. 克隆并运行 [detect-gpu](https://github.com/mayooot/detect-gpu)。
 
 ## 使用源码构建
 
@@ -168,7 +170,7 @@ vim etc/config.yaml
 
 * gpuScheduler：分配 GPU 资源的调度器，将容器使用 GPU 的占用情况保存到 gpuStatusMap。
     * gpuStatusMap：
-      维护服务器的 GPU 资源，当程序第一次启动时，调用 detect-gpu 获取全部的 GPU 资源，并初始化 gpuStatusMap，Key 为 GPU 的
+      维护服务器的 GPU 资源，当程序第一次启动时，调用 `nvidia-smi` 获取全部的 GPU 资源，并初始化 gpuStatusMap，Key 为 GPU 的
       UUID，Value 为 使用情况，0 代表未占用，1 代表已占用。
 
 * portScheduler：分配 Port 资源的调度器，将容器使用的 Port 资源保存到 usedPortSet。
@@ -187,8 +189,6 @@ vim etc/config.yaml
     * /apis/v1/ports/usedPortSetKey
     * /apis/v1/versions/containerVersionMapKey
     * /apis/v1/versions/volumeVersionMapKey
-
-* dete-gpu：调用 go-nvml 的一个小工具，启动时会提供一个 HTTP 接口用于获取 GPU 信息。
 
 ## 架构图
 
