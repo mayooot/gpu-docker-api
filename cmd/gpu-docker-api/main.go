@@ -70,7 +70,7 @@ func (p *program) Init(svc.Environment) error {
 
 	workQueue.InitWorkQueue()
 
-	if err = gpuscheduler.Init(p.cfg); err != nil {
+	if err = gpuscheduler.Init(); err != nil {
 		return err
 	}
 

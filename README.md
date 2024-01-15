@@ -4,7 +4,7 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)
 
 [简体中文](docs%2Fzh-cn.md)
-> ⚠️注意：中文文档已经过期，请使用英文文档。
+> ⚠️注意：中文文档更新可能落后于英文文档，请以英文文档为准。
 >
 
 # Overview
@@ -116,7 +116,6 @@ Import [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) to invok
    tutorial: [volume-size-scale-en.md](docs%2Fvolume%2Fvolume-size-scale-en.md)
 4. Make sure your test environment has ETCD V3 installed, installation
    tutorial: [ETCD](https://github.com/etcd-io/etcd).
-5. Clone and run [detect-gpu](https://github.com/mayooot/detect-gpu).
 
 ## Build From Source
 
@@ -127,6 +126,7 @@ $ make build
 ~~~
 
 ## Download From Release
+
 [release](https://github.com/mayooot/gpu-docker-api/releases)
 
 ## Config File
@@ -193,7 +193,7 @@ And workQueue asynchronous processing in Client-go.
 
 * gpuScheduler：A scheduler that allocates GPU resources and saves the used GPUs.
     * gpuStatusMap：
-      Maintain the GPU resources of the server, when the program starts for the first time, call detect-gpu to get all
+      Maintain the GPU resources of the server, when the program starts for the first time, call `nvidia-smi` to get all
       the GPU resources, and initialize gpuStatusMap, Key is the UUID of GPU, Value is the usage, 0 means used, 1 means
       unused.
 
@@ -214,8 +214,6 @@ And workQueue asynchronous processing in Client-go.
     * /apis/v1/versions/containerVersionMapKey
     * /apis/v1/versions/volumeVersionMapKey
 
-* detect-gpu：A simple HTTP server that calls [go-nvml](https://github.com/NVIDIA/go-nvml) to get the GPU of the host
-  computer.
 
 ## Architecture Diagram
 
