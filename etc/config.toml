@@ -4,11 +4,6 @@ port = ":2378"
 # etcd addr
 etcd_addr = "127.0.0.1:2379"
 
-# detect-gpu addr
-detect_gpu_addr = "http://127.0.0.1:2376/api/v1/detect/gpu"
-# host gpu count
-available_gpu_nums = 8
-
 # available port range
 start_port = 40000
 end_port = 65535

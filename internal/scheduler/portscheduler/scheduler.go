@@ -2,7 +2,7 @@ package portscheduler
 
 import (
 	"encoding/json"
-	"errors"
+	"github.com/pkg/errors"
 	"sort"
 	"strconv"
 	"sync"
@@ -59,7 +59,7 @@ func Init(cfg *config.Config) error {
 	var err error
 	Scheduler, err = initFormEtcd()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "initFormEtcd failed")
 	}
 
 	if Scheduler.StartPort == 0 || Scheduler.EndPort == 0 || Scheduler.AvailableCount == 0 {

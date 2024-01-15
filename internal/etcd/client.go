@@ -1,6 +1,7 @@
 package etcd
 
 import (
+	"github.com/pkg/errors"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -18,8 +19,10 @@ func InitEtcdClient(cfg *config.Config) error {
 		DialTimeout: 2 * time.Second,
 		DialOptions: []grpc.DialOption{grpc.WithBlock()},
 	})
-
-	return err
+	if err != nil {
+		return errors.Wrap(err, "failed to connect etcd")
+	}
+	return nil
 }
 
 func CloseEtcdClient() error {

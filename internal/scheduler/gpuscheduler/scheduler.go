@@ -2,27 +2,31 @@ package gpuscheduler
 
 import (
 	"encoding/json"
-	"errors"
-	"io/ioutil"
-	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 
-	"github.com/mayooot/gpu-docker-api/internal/config"
+	"github.com/commander-cli/cmd"
+	"github.com/pkg/errors"
+
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
-	"github.com/mayooot/gpu-docker-api/internal/model"
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 const (
-	// 默认的可用GPU 数量
-	defaultAvailableGpuNums = 8
+	// 执行命令获取 gpu 的 index 和 uuid
+	allGpuUUIDCommand = "nvidia-smi --query-gpu=index,uuid --format=csv,noheader,nounits"
 
 	// gpuScheduler 存储在 etcd 中的 key
 	gpuStatusMapKey = "gpuStatusMapKey"
 )
 
 var Scheduler *scheduler
+
+type gpu struct {
+	Index int     `json:"index"`
+	UUID  *string `json:"uuid"`
+}
 
 type scheduler struct {
 	sync.RWMutex
@@ -31,26 +35,23 @@ type scheduler struct {
 	GpuStatusMap     map[string]byte
 }
 
-func Init(cfg *config.Config) error {
+func Init() error {
 	var err error
 	Scheduler, err = initFormEtcd()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "initFormEtcd failed")
 	}
 
 	if Scheduler.AvailableGpuNums == 0 || len(Scheduler.GpuStatusMap) == 0 {
 		// 如果没有初始化过
-		Scheduler.AvailableGpuNums = defaultAvailableGpuNums
-		if cfg.AvailableGpuNums >= 0 {
-			Scheduler.AvailableGpuNums = cfg.AvailableGpuNums
+		gpus, err := getAllGpuUUID()
+		if err != nil {
+			return errors.Wrap(err, "getAllGpuUUID failed")
 		}
 
-		gpus, err := getDetectGpus(cfg.DetectGPUAddr)
-		if err != nil {
-			return err
-		}
+		Scheduler.AvailableGpuNums = len(gpus)
 		for i := 0; i < len(gpus); i++ {
-			Scheduler.GpuStatusMap[gpus[i].UUID] = 0
+			Scheduler.GpuStatusMap[*gpus[i].UUID] = 0
 		}
 	}
 	return nil
@@ -139,20 +140,40 @@ func initFormEtcd() (s *scheduler, err error) {
 	return s, err
 }
 
-func getDetectGpus(addr string) (gpus []model.GpuInfo, err error) {
-	resp, err := http.Get(addr)
+func getAllGpuUUID() ([]*gpu, error) {
+	c := cmd.NewCommand(allGpuUUIDCommand)
+	err := c.Execute()
 	if err != nil {
-		return gpus, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return gpus, err
+		return nil, errors.Wrap(err, "cmd.Execute failed")
 	}
 
-	if err = json.Unmarshal(body, &gpus); err != nil {
-		return gpus, err
+	gpuList, err := parseOutput(c.Stdout())
+	if err != nil {
+		return nil, errors.Wrap(err, "parseOutput failed")
 	}
-	return gpus, err
+	return gpuList, nil
+}
+
+func parseOutput(output string) (gpuList []*gpu, err error) {
+	lines := strings.Split(output, "\n")
+	gpuList = make([]*gpu, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		fields := strings.Split(line, ", ")
+		if len(fields) == 2 {
+			index, err := strconv.Atoi(fields[0])
+			if err != nil {
+				return gpuList, errors.Wrapf(err, "strconv.Atoi failed, index: %s", fields[0])
+			}
+			uuid := fields[1]
+			gpuList = append(gpuList, &gpu{
+				Index: index,
+				UUID:  &uuid,
+			})
+		}
+	}
+	return
 }
