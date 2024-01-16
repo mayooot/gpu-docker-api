@@ -4,24 +4,17 @@ import (
 	"encoding/json"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/pkg/errors"
 
-	"github.com/mayooot/gpu-docker-api/internal/config"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
-const (
-	// 默认端口范围 [4000, 65535]
-	defaultStartPort   = 40000
-	defaultEndPort     = 65535
-	availablePortCount = defaultEndPort - defaultStartPort + 1
-
-	// portScheduler 存储在 etcd 中的 key
-	usedPortSetKey = "usedPortSetKey"
-)
+// portScheduler 存储在 etcd 中的 key
+const usedPortSetKey = "usedPortSetKey"
 
 var Scheduler *scheduler
 
@@ -56,7 +49,7 @@ func (s *scheduler) MarshalJSON() ([]byte, error) {
 		UsedPortSet: onlyKeys})
 }
 
-func Init(cfg *config.Config) error {
+func Init(portRange string) error {
 	var err error
 	Scheduler, err = initFormEtcd()
 	if err != nil {
@@ -65,14 +58,13 @@ func Init(cfg *config.Config) error {
 
 	if Scheduler.StartPort == 0 || Scheduler.EndPort == 0 || Scheduler.AvailableCount == 0 {
 		// 如果没有初始化过
-		Scheduler.StartPort = defaultStartPort
-		Scheduler.EndPort = defaultEndPort
-		Scheduler.AvailableCount = availablePortCount
-		if cfg.StartPort >= 0 && cfg.EndPort >= 0 {
-			Scheduler.StartPort = cfg.StartPort
-			Scheduler.EndPort = cfg.EndPort
-			Scheduler.AvailableCount = cfg.EndPort - cfg.StartPort + 1
+		startPort, endPort, err := splitPortRange(portRange)
+		if err != nil {
+			return errors.Wrap(err, "splitPortRange failed")
 		}
+		Scheduler.StartPort = startPort
+		Scheduler.EndPort = endPort
+		Scheduler.AvailableCount = Scheduler.EndPort - Scheduler.StartPort + 1
 	}
 
 	return nil
@@ -164,4 +156,27 @@ func initFormEtcd() (s *scheduler, err error) {
 		s.UsedPortSet[port] = struct{}{}
 	}
 	return s, err
+}
+
+func splitPortRange(portRange string) (startPort, endPort int, err error) {
+	parts := strings.Split(portRange, "-")
+	if len(parts) != 2 {
+		return 0, 0, errors.Errorf("invalid port range format, portRange: %s", portRange)
+	}
+
+	startPort, err = strconv.Atoi(parts[0])
+	if err != nil {
+		return 0, 0, errors.Errorf("invalid start port: %s", parts[0])
+	}
+
+	endPort, err = strconv.Atoi(parts[1])
+	if err != nil {
+		return 0, 0, errors.Errorf("invalid end port: %s", parts[1])
+	}
+
+	if startPort < 0 || startPort > 65535 || endPort < 0 || endPort > 65535 || startPort > endPort {
+		return 0, 0, errors.Errorf("invalid port range values, startPort: %d, endPort: %d", startPort, endPort)
+	}
+
+	return
 }

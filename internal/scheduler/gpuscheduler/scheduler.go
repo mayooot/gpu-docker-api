@@ -166,7 +166,7 @@ func parseOutput(output string) (gpuList []*gpu, err error) {
 		if len(fields) == 2 {
 			index, err := strconv.Atoi(fields[0])
 			if err != nil {
-				return gpuList, errors.Wrapf(err, "strconv.Atoi failed, index: %s", fields[0])
+				return gpuList, errors.Errorf("invaild index: %s, ", fields[0])
 			}
 			uuid := fields[1]
 			gpuList = append(gpuList, &gpu{

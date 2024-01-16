@@ -6,16 +6,14 @@ import (
 	"github.com/pkg/errors"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
-
-	"github.com/mayooot/gpu-docker-api/internal/config"
 )
 
 var cli *clientv3.Client
 
-func InitEtcdClient(cfg *config.Config) error {
+func InitEtcdClient(addr string) error {
 	var err error
 	cli, err = clientv3.New(clientv3.Config{
-		Endpoints:   []string{cfg.EtcdAddr},
+		Endpoints:   []string{addr},
 		DialTimeout: 2 * time.Second,
 		DialOptions: []grpc.DialOption{grpc.WithBlock()},
 	})

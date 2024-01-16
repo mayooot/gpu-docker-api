@@ -1,9 +1,0 @@
-# gin startup port
-port = ":2378"
-
-# etcd addr
-etcd_addr = "127.0.0.1:2379"
-
-# available port range
-start_port = 40000
-end_port = 65535

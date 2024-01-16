@@ -13,7 +13,6 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"github.com/mayooot/gpu-docker-api/internal/api"
-	"github.com/mayooot/gpu-docker-api/internal/config"
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/scheduler/gpuscheduler"
@@ -30,13 +29,16 @@ var (
 	BuildTime string
 )
 
-var configFile = flag.StringP("config", "c", "./etc/config.toml", "config file path")
+var (
+	addr      = flag.StringP("addr", "a", "0.0.0.0:2378", "Address of gpu-docker-api server, format: ip:port")
+	etcdAddr  = flag.StringP("etcd", "e", "0.0.0.0:2379", "Address of etcd server, format: ip:port")
+	portRange = flag.StringP("portRange", "p", "40000-65535", "Port range of docker container, format: startPort-endPort")
+	logLevel  = flag.StringP("logLevel", "l", "debug", "Log level, optional: release")
+)
 
 type program struct {
 	ctx context.Context
 	wg  sync.WaitGroup
-
-	cfg *config.Config
 }
 
 func main() {
@@ -54,17 +56,13 @@ func (p *program) Init(svc.Environment) error {
 	flag.Parse()
 
 	p.ctx = context.Background()
-	log.SetLevelByString("info")
+	log.SetLevelByString(*logLevel)
 
-	p.cfg, err = config.NewConfigWithFile(*configFile)
-	if err != nil {
-		return err
-	}
 	if err = docker.InitDockerClient(); err != nil {
 		return err
 	}
 
-	if err = etcd.InitEtcdClient(p.cfg); err != nil {
+	if err = etcd.InitEtcdClient(*etcdAddr); err != nil {
 		return err
 	}
 
@@ -74,7 +72,7 @@ func (p *program) Init(svc.Environment) error {
 		return err
 	}
 
-	if err = portscheduler.Init(p.cfg); err != nil {
+	if err = portscheduler.Init(*portRange); err != nil {
 		return err
 	}
 
@@ -92,7 +90,10 @@ func (p *program) Start() error {
 		gh api.Resource
 	)
 
-	gin.SetMode(gin.DebugMode)
+	fmt.Printf("CONFIG\n addr: %s\n etcdAddr: %s\n portRange: %s\n logLevel: %s\n\n", *addr, *etcdAddr, *portRange, *logLevel)
+	log.Info("gpu-docker-api started successfully!")
+
+	gin.SetMode(*logLevel)
 	r := gin.New()
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
@@ -106,7 +107,7 @@ func (p *program) Start() error {
 	gh.RegisterRoute(apiv1)
 
 	go func() {
-		_ = r.Run(p.cfg.Port)
+		_ = r.Run(*addr)
 	}()
 
 	go workQueue.SyncLoop(p.ctx, &p.wg)
@@ -115,10 +116,9 @@ func (p *program) Start() error {
 }
 
 func (p *program) Stop() error {
+	log.Info("gpu-docker-api is stopping...")
 	p.ctx.Done()
 	p.wg.Wait()
-
-	log.Info("stopping gpu-docker-api")
 
 	workQueue.Close()
 	docker.CloseDockerClient()
@@ -126,5 +126,6 @@ func (p *program) Stop() error {
 	portscheduler.Close()
 	version.Close()
 	etcd.CloseEtcdClient()
+	log.Info("gpu-docker-api stopped successfully!")
 	return nil
 }
