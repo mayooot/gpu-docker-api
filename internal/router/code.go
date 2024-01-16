@@ -1,4 +1,4 @@
-package api
+package router
 
 type ResCode int64
 
@@ -13,20 +13,18 @@ const (
 	CodeContainerNameNotNull
 	CodeContainerNameNotContainsDash
 	CodeContainerNameMustContainVersion
-	CodeContainerContainerNameNotNull
 	CodeContainerRunFailed
-	CodeContainerIDNotNull
 	CodeContainerDeleteFailed
 	CodeContainerExecuteFailed
 	CodeContainerPatchGpuInfoFailed
 	CodeContainerExisted
+	CodeContainerNoNeedPatch
 	CodeContainerPatchVolumeInfoFailed
+	CodeContainerPatchVolumeInfoExistNull
 	CodeContainerStopFailed
 	CodeContainerRestartFailed
 	CodeContainerGpuCountMustGreaterThanZero
 	CodeContainerGpuNotEnough
-	CodeContainerGpuNoNeedPatch
-	CodeContainerVolumeNoNeedPatch
 	CodeContainerCommitFailed
 	CodeContainerGetInfoFailed
 
@@ -42,8 +40,6 @@ const (
 	CodeVolumeNameNotBeginWithForwardSlash
 	CodeVolumeGetInfoFailed
 
-	CodeEtcdDeleteFailed
-
 	CodeVersionNotMatch
 )
 
@@ -56,22 +52,20 @@ var codeMsgMap = map[ResCode]string{
 	CodeContainerMustPassedIDOrName:          "必须传递 ID 或 name",
 	CodeContainerNameNotNull:                 "容器名称为空",
 	CodeContainerImageNotNull:                "镜像不能为空",
-	CodeContainerContainerNameNotNull:        "容器名称不能为空",
 	CodeContainerNameNotContainsDash:         "容器名称不能包含-",
 	CodeContainerNameMustContainVersion:      "容器名称必须包含版本号",
 	CodeContainerRunFailed:                   "容器启动失败",
-	CodeContainerIDNotNull:                   "容器 ID 为空",
 	CodeContainerDeleteFailed:                "容器删除失败",
 	CodeContainerExecuteFailed:               "容器执行失败",
 	CodeContainerPatchGpuInfoFailed:          "更新容器 GPU 配置失败",
 	CodeContainerExisted:                     "容器已存在",
+	CodeContainerNoNeedPatch:                 "容器不需要更新",
 	CodeContainerPatchVolumeInfoFailed:       "更新容器挂载卷配置失败",
+	CodeContainerPatchVolumeInfoExistNull:    "Patch Volume 字段存在空字符串",
 	CodeContainerStopFailed:                  "容器停止失败",
 	CodeContainerRestartFailed:               "容器重启动失败",
 	CodeContainerGpuCountMustGreaterThanZero: "容器 GPU 数量必须大于 0",
 	CodeContainerGpuNotEnough:                "没有足够的 GPU 资源",
-	CodeContainerGpuNoNeedPatch:              "容器 GPU 资源不需要更新，因为更新前后数量一样",
-	CodeContainerVolumeNoNeedPatch:           "容器 Volume 挂载不需要更新，因为更新前后挂载一样",
 	CodeContainerCommitFailed:                "容器提交为镜像失败",
 	CodeContainerGetInfoFailed:               "获取容器信息失败",
 
@@ -86,8 +80,6 @@ var codeMsgMap = map[ResCode]string{
 	CodeVolumeNameNotContainsDash:          "Volume 名称不能包含-",
 	CodeVolumeNameNotBeginWithForwardSlash: "Volume 名称不能以 / 开头",
 	CodeVolumeGetInfoFailed:                "获取 Volume 信息失败",
-
-	CodeEtcdDeleteFailed: "删除 etcd 中的资源失败",
 
 	CodeVersionNotMatch: "要更新的资源的版本号和存储在 ETCD 中最新的版本号不匹配",
 }

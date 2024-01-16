@@ -1,4 +1,4 @@
-package api
+package router
 
 import (
 	"strings"
@@ -23,10 +23,8 @@ func (ch *ContainerHandler) RegisterRoute(g *gin.RouterGroup) {
 	g.DELETE("/containers/:name", ch.delete)
 	// 执行容器
 	g.POST("/containers/:name/execute", ch.execute)
-	// 变更已存在容器的 GPU 资源
-	g.PATCH("/containers/:name/gpu", ch.patchGpuInfo)
-	// 变更已存在容器的 Volume 资源
-	g.PATCH("/containers/:name/volume", ch.pathVolumeInfo)
+	// 更新容器
+	g.PATCH("/containers/:name", ch.patch)
 	// 停止容器
 	g.PATCH("/containers/:name/stop", ch.stop)
 	// 重启容器
@@ -155,77 +153,54 @@ func (ch *ContainerHandler) execute(c *gin.Context) {
 	})
 }
 
-func (ch *ContainerHandler) patchGpuInfo(c *gin.Context) {
+func (ch *ContainerHandler) patch(c *gin.Context) {
 	name := c.Param("name")
 	if len(name) == 0 {
-		log.Error("failed to patch container gpu info, name is empty")
+		log.Error("failed to patch container, container name is empty")
 		ResponseError(c, CodeContainerNameNotNull)
 		return
 	}
 
 	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
-		log.Errorf("failed to patch container gpu info, name: %s must be in format: name-version", name)
+		log.Errorf("failed to patch container, name: %s must be in format: name-version", name)
 		ResponseError(c, CodeContainerNameMustContainVersion)
+		return
 	}
 
-	var spec model.ContainerGpuPatch
+	var spec model.PatchRequest
 	if err := c.ShouldBindJSON(&spec); err != nil {
-		log.Error("failed to patch container gpu info, error:", err.Error())
+		log.Errorf("failed to patch container, error: %v", err)
 		ResponseError(c, CodeInvalidParams)
 		return
 	}
 
-	id, containerName, err := cs.PatchContainerGpuInfo(name, &spec)
+	if spec.GpuPatch != nil && spec.GpuPatch.GpuCount < 0 {
+		log.Errorf("failed to patch container, gpucount: %d must be greater than or equal to 0", spec.GpuPatch.GpuCount)
+		ResponseError(c, CodeContainerGpuCountMustGreaterThanZero)
+		return
+	}
+
+	if spec.VolumePatch != nil && (spec.VolumePatch.Type == "" ||
+		spec.VolumePatch.OldBind.Format() == "" ||
+		spec.VolumePatch.NewBind.Format() == "") {
+		log.Errorf("failed to patch container,volume patch info is invalid: %v", spec.VolumePatch)
+		ResponseError(c, CodeContainerPatchVolumeInfoExistNull)
+		return
+	}
+
+	id, containerName, err := cs.Patch(name, &spec)
 	if err != nil {
-		log.Errorf("service.PatchContainerGpuInfo failed, original error: %T %v", errors.Cause(err), err)
+		log.Errorf("service.Patch failed, original error: %T %v", errors.Cause(err), err)
 		log.Errorf("stack trace: \n%+v\n", err)
+		if xerrors.IsNoPatchRequiredError(err) {
+			ResponseError(c, CodeContainerNoNeedPatch)
+			return
+		}
 		if xerrors.IsVersionNotMatchError(err) {
 			ResponseError(c, CodeVersionNotMatch)
 			return
 		}
 		ResponseError(c, CodeContainerPatchGpuInfoFailed)
-		return
-	}
-
-	ResponseSuccess(c, gin.H{
-		"id":   id,
-		"name": containerName,
-	})
-}
-
-func (ch *ContainerHandler) pathVolumeInfo(c *gin.Context) {
-	name := c.Param("name")
-	if len(name) == 0 {
-		log.Error("failed to patch container volume info, name is empty")
-		ResponseError(c, CodeContainerNameNotNull)
-		return
-	}
-
-	if !strings.Contains(name, "-") || len(strings.Split(name, "-")[1]) == 0 {
-		log.Errorf("failed to patch container volume info, name: %s must be in format: name-version", name)
-		ResponseError(c, CodeContainerNameMustContainVersion)
-	}
-
-	var spec model.ContainerVolumePatch
-	if err := c.ShouldBindJSON(&spec); err != nil {
-		log.Error("failed to patch container volume info, error:", err.Error())
-		ResponseError(c, CodeInvalidParams)
-		return
-	}
-
-	id, containerName, err := cs.PatchContainerVolumeInfo(name, &spec)
-	if err != nil {
-		log.Errorf("service.PatchContainerVolumeInfo failed, original error: %T %v", errors.Cause(err), err)
-		log.Errorf("stack trace: \n%+v\n", err)
-		if xerrors.IsNoPatchRequiredError(err) {
-			ResponseError(c, CodeContainerVolumeNoNeedPatch)
-			return
-		}
-		if xerrors.IsVersionNotMatchError(err) {
-			ResponseError(c, CodeVersionNotMatch)
-			return
-		}
-		ResponseError(c, CodeContainerPatchVolumeInfoFailed)
 		return
 	}
 
