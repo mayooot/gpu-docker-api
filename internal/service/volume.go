@@ -124,7 +124,7 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 	ctx := context.Background()
 	infoBytes, err := etcd.Get(etcd.Volumes, name)
 	if err != nil {
-		return resp, errors.WithMessage(err, "etcd.Get failed")
+		return resp, errors.Wrapf(err, "etcd.Get failed, key: %s", etcd.ResourcePrefix(etcd.Containers, name))
 	}
 	var info model.EtcdVolumeInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
@@ -189,7 +189,7 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *model.VolumeSize) (r
 func (vs *VolumeService) GetVolumeInfo(name string) (info model.EtcdVolumeInfo, err error) {
 	infoBytes, err := etcd.Get(etcd.Volumes, name)
 	if err != nil {
-		return info, errors.WithMessage(err, "etcd.Get failed")
+		return info, errors.Wrapf(err, "etcd.Get failed, key: %s", etcd.ResourcePrefix(etcd.Containers, name))
 	}
 
 	if err = json.Unmarshal(infoBytes, &info); err != nil {

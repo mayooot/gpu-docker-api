@@ -17,6 +17,9 @@ type Bind struct {
 }
 
 func (b *Bind) Format() string {
+	if len(b.Src) == 0 || len(b.Dest) == 0 {
+		return ""
+	}
 	return fmt.Sprintf("%s:%s", b.Src, b.Dest)
 }
 

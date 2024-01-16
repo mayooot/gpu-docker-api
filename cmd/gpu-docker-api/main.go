@@ -12,9 +12,9 @@ import (
 	"github.com/ngaut/log"
 	flag "github.com/spf13/pflag"
 
-	"github.com/mayooot/gpu-docker-api/internal/api"
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
+	"github.com/mayooot/gpu-docker-api/internal/router"
 	"github.com/mayooot/gpu-docker-api/internal/scheduler/gpuscheduler"
 	"github.com/mayooot/gpu-docker-api/internal/scheduler/portscheduler"
 	"github.com/mayooot/gpu-docker-api/internal/version"
@@ -30,9 +30,9 @@ var (
 )
 
 var (
-	addr      = flag.StringP("addr", "a", "0.0.0.0:2378", "Address of gpu-docker-api server, format: ip:port")
-	etcdAddr  = flag.StringP("etcd", "e", "0.0.0.0:2379", "Address of etcd server, format: ip:port")
-	portRange = flag.StringP("portRange", "p", "40000-65535", "Port range of docker container, format: startPort-endPort")
+	addr      = flag.StringP("addr", "a", "0.0.0.0:2378", "Address of gpu-docker-router server,format: ip:port")
+	etcdAddr  = flag.StringP("etcd", "e", "0.0.0.0:2379", "Address of etcd server,format: ip:port")
+	portRange = flag.StringP("portRange", "p", "40000-65535", "Port range of docker container,format: startPort-endPort")
 	logLevel  = flag.StringP("logLevel", "l", "debug", "Log level, optional: release")
 )
 
@@ -45,56 +45,54 @@ func main() {
 	fmt.Printf("GPU-DOCKER-API\n BRANCH: %s\n Version: %s\n COMMIT: %s\n GoVersion: %s\n BuildTime: %s\n\n", BRANCH, VERSION, COMMIT, GoVersion, BuildTime)
 	prg := &program{}
 	if err := svc.Run(prg, syscall.SIGINT, syscall.SIGTERM); err != nil {
-		log.Fatal(err)
+		log.Fatal(err.Error())
 	}
 }
 
-func (p *program) Init(svc.Environment) error {
-	var err error
-
+func (p *program) Init(svc.Environment) (err error) {
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
-
 	p.ctx = context.Background()
 	log.SetLevelByString(*logLevel)
 
 	if err = docker.InitDockerClient(); err != nil {
-		return err
+		return
 	}
 
 	if err = etcd.InitEtcdClient(*etcdAddr); err != nil {
-		return err
+		return
 	}
 
 	workQueue.InitWorkQueue()
 
 	if err = gpuscheduler.Init(); err != nil {
-		return err
+		return
 	}
 
 	if err = portscheduler.Init(*portRange); err != nil {
-		return err
+		return
 	}
 
 	if err = version.Init(); err != nil {
-		return err
+		return
 	}
 
-	return nil
+	return
 }
 
 func (p *program) Start() error {
 	var (
-		ch api.ContainerHandler
-		vh api.VolumeHandler
-		gh api.Resource
+		ch router.ContainerHandler
+		vh router.VolumeHandler
+		gh router.Resource
 	)
 
 	fmt.Printf("CONFIG\n addr: %s\n etcdAddr: %s\n portRange: %s\n logLevel: %s\n\n", *addr, *etcdAddr, *portRange, *logLevel)
-	log.Info("gpu-docker-api started successfully!")
+	log.Info("gpu-docker-router started successfully!")
 
 	gin.SetMode(*logLevel)
 	r := gin.New()
+	r.Use(router.Cors())
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"message": "pong",
@@ -116,7 +114,7 @@ func (p *program) Start() error {
 }
 
 func (p *program) Stop() error {
-	log.Info("gpu-docker-api is stopping...")
+	log.Info("gpu-docker-router is stopping...")
 	p.ctx.Done()
 	p.wg.Wait()
 
@@ -126,6 +124,6 @@ func (p *program) Stop() error {
 	portscheduler.Close()
 	version.Close()
 	etcd.CloseEtcdClient()
-	log.Info("gpu-docker-api stopped successfully!")
+	log.Info("gpu-docker-router stopped successfully!")
 	return nil
 }

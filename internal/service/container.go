@@ -87,7 +87,7 @@ func (cs *ContainerService) RunGpuContainer(spec *model.ContainerRun) (id, conta
 	}
 
 	// 创建并启动容器
-	id, containerName, err = cs.runContainer(ctx, spec.ContainerName, model.EtcdContainerInfo{
+	id, containerName, err = cs.runContainer(ctx, spec.ContainerName, &model.EtcdContainerInfo{
 		Config:           &config,
 		HostConfig:       &hostConfig,
 		NetworkingConfig: &networkingConfig,
@@ -174,18 +174,15 @@ func (cs *ContainerService) ExecuteContainer(name string, exec *model.ContainerE
 	return
 }
 
-// PatchContainerGpuInfo 变更容器的 GPU 资源
-// 关于容器即将变为无卡容器，还是变为有卡容器，全由入参中的 GpuCount 决定，你只需要告诉我你想要的 GPU 资源数量
-// 例如 GPUCount 为 0，就是要将旧容器变为无卡容器，GPUCount 为 1，就是要将旧容器变为有卡容器
-// 对于状态未发生变化，如：无卡变无卡，有卡容器 GPU 数量变更前后一致，会直接跳过，以提高效率
-func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.ContainerGpuPatch) (id, newContainerName string, err error) {
+// Patch 变更容器的配置，通过滚动更新的方式
+func (cs *ContainerService) Patch(name string, spec *model.PatchRequest) (id, newContainerName string, err error) {
 	// 从 etcd 中获取容器的描述
 	ctx := context.Background()
 	infoBytes, err := etcd.Get(etcd.Containers, name)
 	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
+		return id, newContainerName, errors.Wrapf(err, "etcd.Get failed, key: %s", etcd.ResourcePrefix(etcd.Containers, name))
 	}
-	var info model.EtcdContainerInfo
+	info := &model.EtcdContainerInfo{}
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
 		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
@@ -197,15 +194,55 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 			"container: %s, etcd version: %d, patch version: %s", name, info.Version, strings.Split(name, "-")[1])
 	}
 
+	// 更新 Gpu 配置
+	info, err = cs.patchGpu(name, spec.GpuPatch, info)
+	if err != nil {
+		return id, newContainerName, errors.WithMessage(err, "patchGpu failed")
+	}
+
+	// 更新 Volume 配置
+	info, err = cs.patchVolume(name, spec.VolumePatch, info)
+	if err != nil {
+		return id, newContainerName, errors.WithMessage(err, "patchVolume failed")
+	}
+
+	// 创建一个新的容器，用来替换旧的容器
+	id, newContainerName, err = cs.runContainer(ctx, strings.Split(name, "-")[0], info)
+	if err != nil {
+		return id, newContainerName, errors.WithMessage(err, "runContainer failed")
+	}
+
+	// 异步拷贝旧容器的系统盘到新的容器
+	workQueue.Queue <- &workQueue.CopyTask{
+		Resource:    etcd.Containers,
+		OldResource: info.ContainerName,
+		NewResource: newContainerName,
+	}
+
+	// 停止旧的容器
+	// 选择不归还 GPU 资源，因为降低 GPU 配置时，已经归还了 GPU 资源。而升级配置时，会使用原有的卡，所以不需要归还
+	_ = cs.StopContainer(name, &model.ContainerStop{
+		RestoreGpus:  false,
+		RestorePorts: true,
+	})
+
+	log.Infof("service.Patch, container: %s patch configuration successfully", name)
+	return
+}
+
+func (cs *ContainerService) patchGpu(name string, spec *model.GpuPatch, info *model.EtcdContainerInfo) (*model.EtcdContainerInfo, error) {
+	if spec == nil {
+		return info, nil
+	}
 	// 获取容器的 gpu 资源
 	uuids, err := cs.containerDeviceRequestsDeviceIDs(name)
 	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
+		return info, errors.WithMessage(err, "service.containerDeviceRequestsDeviceIDs failed")
 	}
 
 	// 当前容器使用的 gpu 资源和要 patch 的 gpu 资源相同
 	if len(uuids) == spec.GpuCount {
-		return id, newContainerName, errors.Wrapf(xerrors.NewNoPatchRequiredError(), "container: %s", name)
+		return info, errors.Wrapf(xerrors.NewNoPatchRequiredError(), "container: %s", name)
 	}
 
 	if spec.GpuCount > len(uuids) {
@@ -214,7 +251,7 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 		uuids, err := gpuscheduler.Scheduler.ApplyGpus(applyGpus)
 		log.Infof("service.PatchContainerGpuInfo, container: %s apply %d gpus, uuids: %+v", name, applyGpus, uuids)
 		if err != nil {
-			return id, newContainerName, errors.WithMessage(err, "gpuscheduler.Scheduler.ApplyGpus failed")
+			return info, errors.WithMessage(err, "gpuscheduler.Scheduler.ApplyGpus failed")
 		}
 		if applyGpus == spec.GpuCount {
 			// 之前是无卡容器，所以实际申请的 gpu 资源和 要升级的 gpu 资源相同
@@ -245,86 +282,25 @@ func (cs *ContainerService) PatchContainerGpuInfo(name string, spec *model.Conta
 		}
 	}
 
-	// 创建一个新的容器，用来替换旧的容器
-	id, newContainerName, err = cs.runContainer(ctx, strings.Split(name, "-")[0], info)
-	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.runContainer failed")
-	}
-
-	// 异步拷贝旧容器的系统盘到新的容器
-	workQueue.Queue <- &workQueue.CopyTask{
-		Resource:    etcd.Containers,
-		OldResource: info.ContainerName,
-		NewResource: newContainerName,
-	}
-
-	// 停止旧的容器
-	// 选择不归还 GPU 资源，因为降低 GPU 配置时，已经归还了 GPU 资源。而升级配置时，会使用原有的卡，所以不需要归还
-	_ = cs.StopContainer(name, &model.ContainerStop{
-		RestoreGpus:  false,
-		RestorePorts: true,
-	})
-
-	log.Infof("service.PatchContainerGpuInfo, container: %s patch gpu info successfully", name)
-	return
+	return info, nil
 }
 
-// PatchContainerVolumeInfo 变更容器的 Volume 资源
-// 需要注意的是，这个方法只是会替换新容器绑定的 Volume 资源
-// 例如 foo-0 容器绑定了 volume-0 到 /root/example 目录，现在要使用的是 volume-1，那么就会将 volume-0 替换成 volume-1，然后创建新容器
-func (cs *ContainerService) PatchContainerVolumeInfo(name string, spec *model.ContainerVolumePatch) (id, newContainerName string, err error) {
+func (cs *ContainerService) patchVolume(name string, spec *model.VolumePatch, info *model.EtcdContainerInfo) (*model.EtcdContainerInfo, error) {
+	if spec == nil {
+		return info, nil
+	}
+
 	if spec.OldBind.Format() == spec.NewBind.Format() {
-		return id, newContainerName, errors.Wrapf(xerrors.NewNoPatchRequiredError(), "container: %s", name)
+		return info, errors.Wrapf(xerrors.NewNoPatchRequiredError(), "container: %s", name)
 	}
 
-	// 从 etcd 中获取容器的描述
-	ctx := context.Background()
-	infoBytes, err := etcd.Get(etcd.Containers, name)
-	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
-	}
-
-	var info model.EtcdContainerInfo
-	if err = json.Unmarshal(infoBytes, &info); err != nil {
-		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
-	}
-
-	// 只有 etcd 中的 Container 对象的版本和要修改的 Container 版本一致时，才能更新
-	if strconv.FormatInt(info.Version, 10) != strings.Split(name, "-")[1] {
-		return id, newContainerName, errors.Wrapf(xerrors.NewVersionNotMatchError(),
-			"container: %s, etcd version: %d, patch version: %s", name, info.Version, strings.Split(name, "-")[1])
-	}
-
-	// 变更容器的绑定信息
 	for i := range info.HostConfig.Binds {
 		if info.HostConfig.Binds[i] == spec.OldBind.Format() {
 			info.HostConfig.Binds[i] = spec.NewBind.Format()
 			break
 		}
 	}
-
-	// 创建一个新的容器，用来替换旧的容器
-	id, newContainerName, err = cs.runContainer(ctx, strings.Split(name, "-")[0], info)
-	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "service.runContainer failed")
-	}
-
-	// 异步拷贝旧容器的系统盘到新的容器
-	workQueue.Queue <- &workQueue.CopyTask{
-		Resource:    etcd.Containers,
-		OldResource: info.ContainerName,
-		NewResource: newContainerName,
-	}
-
-	// 停止旧的容器
-	// 选择不归还 GPU 资源，因为更改 Volume 配置不涉及 GPU 资源的申请与释放
-	_ = cs.StopContainer(name, &model.ContainerStop{
-		RestoreGpus:  false,
-		RestorePorts: true,
-	})
-
-	log.Infof("service.PatchContainerVolumeInfo, container: %s patch volume info successfully", name)
-	return
+	return info, nil
 }
 
 // StopContainer 停止容器
@@ -389,9 +365,9 @@ func (cs *ContainerService) RestartContainer(name string) (id, newContainerName 
 	// 获取 etcd 中关于容器启动的描述
 	infoBytes, err := etcd.Get(etcd.Containers, name)
 	if err != nil {
-		return id, newContainerName, errors.WithMessage(err, "etcd.Get failed")
+		return id, newContainerName, errors.Wrapf(err, "etcd.Get failed, key: %s", etcd.ResourcePrefix(etcd.Containers, name))
 	}
-	var info model.EtcdContainerInfo
+	info := &model.EtcdContainerInfo{}
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
 		return id, newContainerName, errors.WithMessage(err, "json.Unmarshal failed")
 	}
@@ -449,7 +425,7 @@ func (cs *ContainerService) CommitContainer(name string, spec model.ContainerCom
 func (cs *ContainerService) GetContainerInfo(name string) (info model.EtcdContainerInfo, err error) {
 	infoBytes, err := etcd.Get(etcd.Containers, name)
 	if err != nil {
-		return info, errors.WithMessage(err, "etcd.Get failed")
+		return info, errors.Wrapf(err, "etcd.Get failed, key: %s", etcd.ResourcePrefix(etcd.Containers, name))
 	}
 
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
@@ -460,7 +436,7 @@ func (cs *ContainerService) GetContainerInfo(name string) (info model.EtcdContai
 
 // 真正创建容器和启动容器的方法，这个方法不区分是用来创建 GPU 容器还是普通容器，因为它只会根据入参来创建容器
 // 用于创建容器、变更容器的 GPU 信息、变更容器的 Volume 信息、重启动 GPU 容器等
-func (cs *ContainerService) runContainer(ctx context.Context, name string, info model.EtcdContainerInfo) (id, containerName string, err error) {
+func (cs *ContainerService) runContainer(ctx context.Context, name string, info *model.EtcdContainerInfo) (id, containerName string, err error) {
 	// 传递到这个方法的容器名称也就是 name，会被去掉版本号
 	// 例如调用创建容器接口，name 不应该携带 -，例如：foo-0 会报错并返回，应该是 foo
 	// 变更容器的 GPU 信息时，传递的是 bar-0，那么会被去掉版本号，name 变成 bar
@@ -470,6 +446,18 @@ func (cs *ContainerService) runContainer(ctx context.Context, name string, info 
 		vmap.ContainerVersionMap.Set(name, 0)
 	} else {
 		vmap.ContainerVersionMap.Set(name, sync2.AtomicInt64(version.Add(1)))
+	}
+	// 添加环境变量，方便用户区分当前容器的版本
+	isExist := false
+	for i := range info.Config.Env {
+		if strings.HasPrefix(info.Config.Env[i], "CONTAINER_VERSION=") {
+			isExist = true
+			info.Config.Env[i] = fmt.Sprintf("CONTAINER_VERSION=%d", version)
+			break
+		}
+	}
+	if !isExist {
+		info.Config.Env = append(info.Config.Env, fmt.Sprintf("CONTAINER_VERSION=%d", version))
 	}
 
 	defer func() {

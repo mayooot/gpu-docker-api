@@ -19,14 +19,19 @@ type ContainerExecute struct {
 	Cmd     []string `json:"cmd,omitempty"`
 }
 
-type ContainerGpuPatch struct {
+type GpuPatch struct {
 	GpuCount int `json:"gpuCount"`
 }
 
-type ContainerVolumePatch struct {
+type VolumePatch struct {
 	Type    mount.Type `json:"type"`
 	OldBind *Bind      `json:"oldBind"`
 	NewBind *Bind      `json:"newBind"`
+}
+
+type PatchRequest struct {
+	GpuPatch    *GpuPatch    `json:"gpuPatch"`
+	VolumePatch *VolumePatch `json:"volumePatch"`
 }
 
 type ContainerDelete struct {
