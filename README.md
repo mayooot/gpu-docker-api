@@ -29,6 +29,7 @@ Similar to the operation on container instances in [AutoDL](https://www.autodl.c
     - [Build From Source](#build-from-source)
     - [Download From Release](#download-from-release)
     - [Run](#run)
+    - [How To Reset](#how-to-reset)
 - [Architecture](#architecture)
     - [Component Introduction](#component-introduction)
     - [Architecture Diagram](#architecture-diagram)
@@ -162,6 +163,18 @@ And enjoy it.
 ~~~
 $ ./gpu-docker-api-linux-amd64
 ~~~
+
+## How To Reset
+
+As you know, we save some information in etcd and locally, so when you want to delete them,
+you can use this [reset.sh](scripts%2Freset.sh).
+
+Or if you downloaded the executable file from release, you can use the following command to get it and place it with
+executable file.
+
+```
+wget https://github.com/mayooot/gpu-docker-api/blob/main/scripts/reset.sh
+```
 
 # Architecture
 
