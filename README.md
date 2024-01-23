@@ -115,7 +115,7 @@ and implement the function of rollback to the specified version.
 Select any of the following.
 
 * Import [gpu-docker-api-en.openapi.json](api%2Fgpu-docker-api-en.openapi.json) to [ApiFox](https://apifox.com).
-* View [gpu-docker-api-en.html](api%2Fgpu-docker-api-en.html) or [gpu-docker-api-en.md](api%2Fgpu-docker-api-en.md).
+* View [gpu-docker-api-en.md](api%2Fgpu-docker-api-en.md).
 
 ## Environmental Preparation
 
