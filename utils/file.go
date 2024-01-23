@@ -2,9 +2,12 @@ package utils
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strconv"
+
+	"github.com/pkg/errors"
 )
 
 func DirSize(path string) (int64, error) {
@@ -42,4 +45,15 @@ func ToBytes(origin string) (int64, error) {
 	}
 
 	return int64(size * float64(multiplier)), nil
+}
+
+func IsDir(src string) error {
+	srcInfo, err := os.Stat(src)
+	if err != nil && errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	if !srcInfo.IsDir() {
+		return errors.Errorf("%s is not a directory", src)
+	}
+	return nil
 }
