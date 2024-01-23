@@ -116,6 +116,8 @@ Select any of the following.
 
 * Import [gpu-docker-api-en.openapi.json](api%2Fgpu-docker-api-en.openapi.json) to [ApiFox](https://apifox.com).
 * View [gpu-docker-api-en.md](api%2Fgpu-docker-api-en.md).
+* View this [online api](https://apifox.com/apidoc/shared-cca36339-a3f1-4f6b-b8fe-4274ef3529ec), but it can expire at
+  any time.
 
 ## Environmental Preparation
 
