@@ -3,48 +3,35 @@ package version
 import (
 	"encoding/json"
 
-	cmap "github.com/orcaman/concurrent-map/v2"
-	"github.com/siddontang/go/sync2"
-
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 var (
-	// ContainerVersionMap 用于追踪容器的版本信息
 	ContainerVersionMap *versionMap
-	// VolumeVersionMap 用于跟踪 Volume 的版本信息
-	VolumeVersionMap *versionMap
+	VolumeVersionMap    *versionMap
 )
 
 const (
-	// 存储在 etcd 中的 key
 	containerVersionMapKey = "containerVersionMapKey"
 	volumeVersionMapKey    = "volumeVersionMapKey"
 )
 
-type versionMap struct {
-	cmap.ConcurrentMap[string, sync2.AtomicInt64]
-}
+type (
+	name    = string
+	version = int64
+)
 
-func newVersionMap() *versionMap {
-	return &versionMap{cmap.New[sync2.AtomicInt64]()}
-}
+type versionMap map[name]version
 
-func (vm *versionMap) serialize() *string {
-	bytes, _ := json.Marshal(vm)
-	tmp := string(bytes)
-	return &tmp
-}
-
-func Init() error {
+func InitVersionMap() error {
 	var err error
-	ContainerVersionMap, err = initVersionMap(containerVersionMapKey)
+	ContainerVersionMap, err = initVersionMapFormEtcd(containerVersionMapKey)
 	if err != nil {
 		return err
 	}
 
-	VolumeVersionMap, err = initVersionMap(volumeVersionMapKey)
+	VolumeVersionMap, err = initVersionMapFormEtcd(volumeVersionMapKey)
 	if err != nil {
 		return err
 	}
@@ -52,7 +39,7 @@ func Init() error {
 	return nil
 }
 
-func Close() error {
+func CloseVersionMap() error {
 	if err := etcd.Put(etcd.Versions, containerVersionMapKey, ContainerVersionMap.serialize()); err != nil {
 		return err
 	}
@@ -62,8 +49,32 @@ func Close() error {
 	return nil
 }
 
-func initVersionMap(key string) (vm *versionMap, err error) {
-	bytes, err := etcd.Get(etcd.Versions, key)
+func (vm *versionMap) serialize() *string {
+	bytes, _ := json.Marshal(vm)
+	tmp := string(bytes)
+	return &tmp
+}
+
+func (vm *versionMap) Set(key name, value version) {
+	(*vm)[key] = value
+}
+
+func (vm *versionMap) Get(key name) (version, bool) {
+	v, ok := (*vm)[key]
+	return v, ok
+}
+
+func (vm *versionMap) Exist(key name) bool {
+	_, ok := (*vm)[key]
+	return ok
+}
+
+func (vm *versionMap) Remove(key name) {
+	delete(*vm, key)
+}
+
+func initVersionMapFormEtcd(key string) (vm *versionMap, err error) {
+	bytes, err := etcd.GetValue(etcd.Versions, key)
 	if err != nil {
 		if xerrors.IsNotExistInEtcdError(err) {
 			err = nil
@@ -77,4 +88,9 @@ func initVersionMap(key string) (vm *versionMap, err error) {
 		err = json.Unmarshal(bytes, &vm)
 	}
 	return vm, err
+}
+
+func newVersionMap() *versionMap {
+	m := make(versionMap)
+	return &m
 }
