@@ -5,7 +5,8 @@
 
 [简体中文](docs%2Fzh-cn.md)
 > ⚠️注意：中文文档可能落后于英文文档，请以英文文档为准。
->
+
+Try to keep it simple.
 
 # Overview
 
@@ -19,16 +20,14 @@ Similar to the operation on container instances in [AutoDL](https://www.autodl.c
 - [GPU-Docker-API](#gpu-docker-api)
 - [Overview](#overview)
 - [Feature](#feature)
-    - [Container](#container)
+    - [ReplicaSet](#replicaset)
     - [Volume](#volume)
-    - [GPU](#gpu)
-    - [Port](#port)
+    - [Resource](#resource)
 - [Quick Start](#quick-start)
-    - [Import API](#import-api)
+    - [How To Use API](#how-to-use-api)
     - [Environmental Preparation](#environmental-preparation)
     - [Build From Source](#build-from-source)
     - [Download From Release](#download-from-release)
-    - [Config File](#config-file)
     - [Run](#run)
 - [Architecture](#architecture)
     - [Component Introduction](#component-introduction)
@@ -66,56 +65,64 @@ which looks pretty cool 😎.
 
 The same is true when updating volume.
 
+---
+
+Last but not least, you can see that we're using a ReplicaSet instead of a container, which if you're familiar with K8s,
+you probably already know what that means, you can
+see [ReplicaSet](https://kubernetes.io/zh-cn/docs/concepts/workloads/controllers/replicaset/).
+
+In this project, ReplicaSet is just a concept, there is no concrete implementation, responsible for managing the
+container's history version,
+and implement the function of rollback to the specified version.
+
 # Feature
 
-## Container
+## ReplicaSet
 
-- [x] Create GPU container
-- [x] Create cardless container
-- [x] Patch container GPU configuration
-- [x] Patch container volume configuration
-- [x] Stop container
-- [x] Restart container
-- [x] Execute commands inside the container
-- [x] Delete container
-- [x] Save container as an image
-- [x] Get container creation information
+- [x] Run a container via replicaSet
+- [x] Commit container as an image via replicaSet
+- [x] Execute a command in the container via replicaSet
+- [x] Patch a container via replicaSet
+- [x] Rollback a container via replicaSet
+- [x] Stop a container via replicaSet
+- [x] Restart a container via replicaSet
+- [x] Pause a replicaSet via replicaSet
+- [x] Continue a replicaSet via replicaSet
+- [x] Get version info about replicaSet
+- [x] Get all version info about replicaSet
+- [x] Delete a container via replicaSet
 
 ## Volume
 
-- [x] Create a volume of the specified capacity size
-- [x] Delete volume
-- [x] Scale up and down volume capacity size
-- [x] Get volume creation information
+- [x] Create a volume
+- [x] Patch a volume
+- [x] Get version info about a volume
+- [x] Get all version info about a volume
+- [x] Delete a volume
 
-## GPU
+## Resource
 
-- [x] View GPU Usage
-
-## Port
-
-- [x] View Used Ports
+- [x] Get gpu usage status
+- [x] Get port usage status
 
 # Quick Start
 
 [👉 Click here to see, my environment](#Environment)
 
-## Import API
+## How To Use API
 
-Import [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) to invoke api.
+Select any of the following.
+
+* Import [gpu-docker-api-en.openapi.json](api%2Fgpu-docker-api-en.openapi.json) to [ApiFox](https://apifox.com).
+* View [gpu-docker-api-en.html](api%2Fgpu-docker-api-en.html) or [gpu-docker-api-en.md](api%2Fgpu-docker-api-en.md).
 
 ## Environmental Preparation
 
-1. The test environment has already installed the corresponding drivers for the NVIDIA graphics card.
-2. Make sure you have NVIDIA Docker installed on your test environment, installation
-   tutorial: [NVIDIA Docker Installation](https://zhuanlan.zhihu.com/p/361934132).
-3. To support the creation of a volume of the specified capacity size, ensure that Docker's Storage Driver is Overlay2.
-   Create
-   and format a partition as an XFS file system, and use the mounted directory as the
-   Docker Root Dir.
-   tutorial: [volume-size-scale-en.md](docs%2Fvolume%2Fvolume-size-scale-en.md)
-4. Make sure your test environment has ETCD V3 installed, installation
-   tutorial: [ETCD](https://github.com/etcd-io/etcd).
+1. The Linux servers has installed NVIDIA GPU drivers, NVIDIA Docker, ETCD V3.
+
+2. [Optional] If you want to specify the size of the docker volume, you need to specify the Docker `Storage Driver`
+   as `Overlay2`,
+   and set the `Docker Root Dir` to the `XFS` file system.
 
 ## Build From Source
 
@@ -129,33 +136,31 @@ $ make build
 
 [release](https://github.com/mayooot/gpu-docker-api/releases)
 
-## Config File
-
-If you download the executable file from [release](https://github.com/mayooot/gpu-docker-api/releases),
-you should download `config.toml` by hand and create the `etc` directory.
-
-The directory structure is as follows:
-
-~~~
-$ tree
-.
-├── etc
-│   └── config.toml
-└── gpu-docker-api-linux-amd64
-
-1 directory, 2 files
-~~~
-
-Then change it the way you want it.
-
-~~~
-vim etc/config.yaml
-~~~
-
 ## Run
 
+You can get help and the default configuration with `-h` parameter.
+
 ~~~
-./gpu-docker-api-${your_os}-amd64
+$ ./gpu-docker-api-linux-amd64 -h
+GPU-DOCKER-API
+ BRANCH: feat/union-patch-and-version-control
+ Version: v0.0.2-12-gc29670a
+ COMMIT: c29670a1dfa8bc5470e282ce9b214398baab3a15
+ GoVersion: go1.21.4
+ BuildTime: 2024-01-23T13:55:51+0800
+
+Usage of ./gpu-docker-api-linux-amd64:
+  -a, --addr string        Address of gpu-docker-routers server,format: ip:port (default "0.0.0.0:2378")
+  -e, --etcd string        Address of etcd server,format: ip:port (default "0.0.0.0:2379")
+  -l, --logLevel string    Log level, optional: release (default "debug")
+  -p, --portRange string   Port range of docker container,format: startPort-endPort (default "40000-65535")
+pflag: help requested
+~~~
+
+And enjoy it.
+
+~~~
+$ ./gpu-docker-api-linux-amd64
 ~~~
 
 # Architecture
@@ -165,7 +170,7 @@ The design is inspired by and borrows a lot from Kubernetes.
 For example, K8s adds full information about resources (Pods, Deployment, etc.) to the ETCD and then uses the ETCD
 version number for rollback.
 
-And workQueue asynchronous processing in Client-go.
+And workQueue asynchronous processing in Client-Go.
 
 ## Component Introduction
 
@@ -177,24 +182,21 @@ And workQueue asynchronous processing in Client-go.
 
     * When a container/volume is created, add the created information to the ETCD.
     * After deleting a container/volume, delete the full information about the resource from the ETCD.
-    * After lifting the GPU/Volume configuration of a container, copy the data of the old container to the new
-      container.
-    * After scaling up and down the capacity size of a Volume resource, copy the data of the old volume to the new
-      volume.
 
 * container/volume VersionMap：
 
-    * Generate version number when creating a container, default is 0, when container is updated, the version number
+    * Generate version number when creating a container, default is 1, when container is updated, the version number
       will
       be +1.
-    * Generate the version number when creating a volume, default is 0, when the volume is updated, the version number
+    * Generate the version number when creating a volume, default is 1, when the volume is updated, the version number
       will
       is +1.
 
 * gpuScheduler：A scheduler that allocates GPU resources and saves the used GPUs.
     * gpuStatusMap：
       Maintain the GPU resources of the server, when the program starts for the first time, call `nvidia-smi` to get all
-      the GPU resources, and initialize gpuStatusMap, Key is the UUID of GPU, Value is the usage, 0 means used, 1 means
+      the GPU resources, and initialize gpuStatusMap.
+      Key is the UUID of GPU, Value is the usage, 0 means used, 1 means
       unused.
 
 * portScheduler：A scheduler that allocates Port resources and saves the used Ports.
@@ -205,15 +207,15 @@ And workQueue asynchronous processing in Client-go.
   Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) in
   order to schedule GPUs.
 
-* etcd：Save the container/volume creation information. For example:
+* etcd：Save the container/volume creation information. The following keys are currently in use:
 
-    * /apis/v1/containers
-    * /apis/v1/volumes
-    * /apis/v1/gpus/gpuStatusMapKey
-    * /apis/v1/ports/usedPortSetKey
-    * /apis/v1/versions/containerVersionMapKey
-    * /apis/v1/versions/volumeVersionMapKey
-
+    * /gpu-docker-api/apis/v1/containers
+    * /gpu-docker-api/apis/v1/volumes
+    * /gpu-docker-api/apis/v1/gpus/gpuStatusMapKey
+    * /gpu-docker-api/apis/v1/ports/usedPortSetKey
+    * /gpu-docker-api/apis/v1/merges/containerMergeMapKey
+    * /gpu-docker-api/apis/v1/versions/containerVersionMapKey
+    * /gpu-docker-api/apis/v1/versions/volumeVersionMapKey
 
 ## Architecture Diagram
 

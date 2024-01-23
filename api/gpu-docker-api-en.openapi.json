@@ -194,7 +194,7 @@
     },
     "/api/v1/replicaSet/{name}/commit": {
       "post": {
-        "summary": "Commit container as a image via replicaSet",
+        "summary": "Commit container as an image via replicaSet",
         "x-apifox-folder": "ReplicaSet",
         "x-apifox-status": "released",
         "deprecated": false,
@@ -666,7 +666,7 @@
         "x-run-in-apifox": "https://apifox.com/web/project/3938577/apis/api-143323407-run"
       },
       "get": {
-        "summary": " Get info about relicaSet",
+        "summary": " Get version info about replicaSet",
         "x-apifox-folder": "ReplicaSet",
         "x-apifox-status": "released",
         "deprecated": false,
@@ -1934,7 +1934,7 @@
     },
     "/api/v1/replicaSet/{name}/history": {
       "get": {
-        "summary": "Get all info about replicaSet",
+        "summary": "Get all version info about replicaSet",
         "x-apifox-folder": "ReplicaSet",
         "x-apifox-status": "released",
         "deprecated": false,
@@ -4048,9 +4048,9 @@
         "x-run-in-apifox": "https://apifox.com/web/project/3938577/apis/api-143323411-run"
       },
       "get": {
-        "summary": "Get info",
+        "summary": "Get version info about a volume",
         "x-apifox-folder": "Volume",
-        "x-apifox-status": "developing",
+        "x-apifox-status": "released",
         "deprecated": false,
         "description": "Get information about the current version of the volume.",
         "tags": [
@@ -4315,7 +4315,7 @@
       "get": {
         "summary": "Get gpu usage status",
         "x-apifox-folder": "Resource",
-        "x-apifox-status": "developing",
+        "x-apifox-status": "released",
         "deprecated": false,
         "description": "0 means not used, 1 means used.",
         "tags": [
@@ -4444,7 +4444,7 @@
       "get": {
         "summary": "Get port usage status",
         "x-apifox-folder": "Resource",
-        "x-apifox-status": "developing",
+        "x-apifox-status": "released",
         "deprecated": false,
         "description": "",
         "tags": [
@@ -4556,7 +4556,7 @@
     },
     "/api/v1/volumes/{name}/history": {
       "get": {
-        "summary": "Get all info",
+        "summary": "Get all version info about a volume",
         "x-apifox-folder": "Volume",
         "x-apifox-status": "released",
         "deprecated": false,
