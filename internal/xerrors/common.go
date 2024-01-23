@@ -5,8 +5,8 @@ import (
 )
 
 const (
-	noPatchRequired = "no patch required"
-	versionNotMatch = "version not match"
+	noPatchRequired    = "no patch required"
+	noRollbackRequired = "no rollback required"
 )
 
 func NewNoPatchRequiredError() error {
@@ -20,13 +20,13 @@ func IsNoPatchRequiredError(err error) bool {
 	return errors.Cause(err).Error() == noPatchRequired
 }
 
-func NewVersionNotMatchError() error {
-	return errors.New(versionNotMatch)
+func NewNoRollbackRequiredError() error {
+	return errors.New(noRollbackRequired)
 }
 
-func IsVersionNotMatchError(err error) bool {
+func IsNoRollbackRequiredError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Cause(err).Error() == versionNotMatch
+	return errors.Cause(err).Error() == noRollbackRequired
 }

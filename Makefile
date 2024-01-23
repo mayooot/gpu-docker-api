@@ -42,4 +42,7 @@ fmt:
 imports:
 	goimports-reviser --rm-unused -local github.com/${GITHUB_USER}/${BINARY} -format ./...
 
-.PHONY: all build linux darwin windows clean fmt imports
+check:
+	golangci-lint run ./...
+
+.PHONY: all build linux darwin windows clean fmt imports check

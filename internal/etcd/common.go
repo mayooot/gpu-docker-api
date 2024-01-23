@@ -3,30 +3,29 @@ package etcd
 import (
 	"context"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
+	"go.etcd.io/etcd/api/v3/mvccpb"
+	clientv3 "go.etcd.io/etcd/client/v3"
 
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
 const (
-	CommonPrefix = "/apis/v1"
-	// ContainerPrefix 容器信息存储在 etcd 中的前缀，同时也用于判断 workQueue 中的 CopyTask 类型
-	//ContainerPrefix = "/apis/v1/containers"
-	// VolumePrefix Volume 信息存储在 etcd 中的前缀，同时也用于判断 workQueue 中的 CopyTask 类型
-	//VolumePrefix = "/apis/v1/volumes"
+	// CommonPrefix is the common prefix for all keys.
+	CommonPrefix = "/gpu-docker-api/apis/v1"
 )
 
-type EtcdResource string
+type Resource = string
 
 const (
-	Containers EtcdResource = "containers"
-	Volumes    EtcdResource = "volumes"
-	Versions   EtcdResource = "versions"
-	Gpus       EtcdResource = "gpus"
-	Ports      EtcdResource = "ports"
+	Containers Resource = "containers"
+	Volumes    Resource = "volumes"
+	Versions   Resource = "versions"
+	Merges     Resource = "merges"
+	Gpus       Resource = "gpus"
+	Ports      Resource = "ports"
 
 	operationDuration = 1 * time.Second
 )
@@ -34,48 +33,65 @@ const (
 type PutKeyValue struct {
 	Key      string
 	Value    *string
-	Resource EtcdResource
+	Resource Resource
 }
 
 type DelKey struct {
-	Resource EtcdResource
+	Resource Resource
 	Key      string
 }
 
-func Put(resource EtcdResource, key string, value *string) error {
+func Put(resource Resource, key string, value *string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), operationDuration)
 	defer cancel()
-	_, err := cli.Put(ctx, resourcePrefix(resource, realName(key)), *value)
+	_, err := cli.Put(ctx, ResourcePrefix(resource, key), *value)
 	if err != nil {
 		return errors.Wrapf(err, "etcd.Put failed, resource %s, key: %s, value: %s", resource, key, *value)
 	}
 	return nil
 }
 
-func Get(resource EtcdResource, key string) (bytes []byte, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), operationDuration)
-	defer cancel()
-	resp, err := cli.Get(ctx, resourcePrefix(resource, realName(key)))
+func GetValue(resource Resource, key string) ([]byte, error) {
+	kvs, err := get(resource, key)
 	if err != nil {
-		return bytes, errors.Wrapf(err, "etcd.Get failed, key: %s", key)
+		return nil, err
 	}
-	if len(resp.Kvs) == 0 {
-		return bytes, errors.Wrapf(xerrors.NewNotExistInEtcdError(), "etcd.Get failed, key: %s", key)
-	}
-	return resp.Kvs[0].Value, err
+	return kvs[0].Value, nil
 }
 
-func Del(resource EtcdResource, key string) error {
+func Del(resource Resource, key string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), operationDuration)
 	defer cancel()
-	_, err := cli.Delete(ctx, resourcePrefix(resource, realName(key)))
+	_, err := cli.Delete(ctx, ResourcePrefix(resource, key))
 	return err
 }
 
-func realName(key string) string {
-	return strings.Split(key, "-")[0]
+func get(resource Resource, key string) ([]*mvccpb.KeyValue, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), operationDuration)
+	defer cancel()
+	resp, err := cli.Get(ctx, ResourcePrefix(resource, key))
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Kvs) == 0 {
+		return nil, xerrors.NewNotExistInEtcdError()
+	}
+	return resp.Kvs, nil
 }
 
-func resourcePrefix(prefix EtcdResource, name string) string {
-	return path.Join(CommonPrefix, string(prefix), name)
+func getWithRev(resource Resource, key string, rev int64) ([]*mvccpb.KeyValue, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), operationDuration)
+	defer cancel()
+	resp, err := cli.Get(ctx, ResourcePrefix(resource, key), clientv3.WithRev(rev))
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Kvs) == 0 {
+		return nil, xerrors.NewNotExistInEtcdError()
+	}
+	return resp.Kvs, nil
+}
+
+func ResourcePrefix(prefix Resource, name string) string {
+	return path.Join(CommonPrefix, prefix, name)
 }

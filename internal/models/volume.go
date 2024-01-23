@@ -1,4 +1,4 @@
-package model
+package models
 
 import (
 	"fmt"
@@ -17,6 +17,9 @@ type Bind struct {
 }
 
 func (b *Bind) Format() string {
+	if len(b.Src) == 0 || len(b.Dest) == 0 {
+		return ""
+	}
 	return fmt.Sprintf("%s:%s", b.Src, b.Dest)
 }
 
@@ -29,7 +32,8 @@ type VolumeSize struct {
 	Size string `json:"size"` // KB, MB, GB, TB
 }
 
-type VolumeDelete struct {
-	Force                       bool `json:"force"`
-	DelEtcdInfoAndVersionRecord bool `json:"delEtcdInfoAndVersionRecord"`
+type VolumeHistoryItem struct {
+	Version    int64          `json:"version"`
+	CreateTime string         `json:"createTime"`
+	Status     EtcdVolumeInfo `json:"status"`
 }

@@ -1,4 +1,4 @@
-package gpuscheduler
+package schedulers
 
 import (
 	"encoding/json"
@@ -14,115 +14,53 @@ import (
 )
 
 const (
-	// 执行命令获取 gpu 的 index 和 uuid
 	allGpuUUIDCommand = "nvidia-smi --query-gpu=index,uuid --format=csv,noheader,nounits"
 
-	// gpuScheduler 存储在 etcd 中的 key
 	gpuStatusMapKey = "gpuStatusMapKey"
 )
 
-var Scheduler *scheduler
+var GpuScheduler *gpuScheduler
 
 type gpu struct {
 	Index int     `json:"index"`
 	UUID  *string `json:"uuid"`
 }
 
-type scheduler struct {
+type gpuScheduler struct {
 	sync.RWMutex
 
-	AvailableGpuNums int
-	GpuStatusMap     map[string]byte
+	AvailableGpuNums int             `json:"availableGpuNums"`
+	GpuStatusMap     map[string]byte `json:"gpuStatusMap"`
 }
 
-func Init() error {
+func InitGPuScheduler() error {
 	var err error
-	Scheduler, err = initFormEtcd()
+	GpuScheduler, err = initGpuFormEtcd()
 	if err != nil {
 		return errors.Wrap(err, "initFormEtcd failed")
 	}
 
-	if Scheduler.AvailableGpuNums == 0 || len(Scheduler.GpuStatusMap) == 0 {
-		// 如果没有初始化过
+	if GpuScheduler.AvailableGpuNums == 0 || len(GpuScheduler.GpuStatusMap) == 0 {
+		// if it has not been initialized
 		gpus, err := getAllGpuUUID()
 		if err != nil {
 			return errors.Wrap(err, "getAllGpuUUID failed")
 		}
 
-		Scheduler.AvailableGpuNums = len(gpus)
+		GpuScheduler.AvailableGpuNums = len(gpus)
 		for i := 0; i < len(gpus); i++ {
-			Scheduler.GpuStatusMap[*gpus[i].UUID] = 0
+			GpuScheduler.GpuStatusMap[*gpus[i].UUID] = 0
 		}
 	}
 	return nil
 }
 
-func Close() error {
-	return etcd.Put(etcd.Gpus, gpuStatusMapKey, Scheduler.serialize())
+func CloseGpuScheduler() error {
+	return etcd.Put(etcd.Gpus, gpuStatusMapKey, GpuScheduler.serialize())
 }
 
-// ApplyGpus 申请一定数量的 GPU
-func (s *scheduler) ApplyGpus(num int) ([]string, error) {
-	if num <= 0 || num > s.AvailableGpuNums {
-		return nil, errors.New("num must be greater than 0 and less than " + strconv.Itoa(s.AvailableGpuNums))
-	}
-
-	s.Lock()
-	defer s.Unlock()
-
-	// 可用的 gpu
-	var availableGpus []string
-	for k, v := range s.GpuStatusMap {
-		if v == 0 {
-			s.GpuStatusMap[k] = 1
-			availableGpus = append(availableGpus, k)
-			if len(availableGpus) == num {
-				break
-			}
-		}
-	}
-
-	// 小于用户申请的
-	if len(availableGpus) < num {
-		return nil, xerrors.NewGpuNotEnoughError()
-	}
-
-	return availableGpus, nil
-}
-
-// RestoreGpus 归还一定数量的 GPU
-func (s *scheduler) RestoreGpus(gpus []string) {
-	if len(gpus) <= 0 || len(gpus) > s.AvailableGpuNums {
-		return
-	}
-
-	s.Lock()
-	defer s.Unlock()
-
-	for _, gpu := range gpus {
-		s.GpuStatusMap[gpu] = 0
-	}
-}
-
-// GetGpusStatus 获取 GPU 使用信息
-func (s *scheduler) GetGpusStatus() map[string]byte {
-	s.RLock()
-	defer s.RUnlock()
-
-	return s.GpuStatusMap
-}
-
-func (s *scheduler) serialize() *string {
-	s.RLock()
-	defer s.RUnlock()
-
-	bytes, _ := json.Marshal(s)
-	tmp := string(bytes)
-	return &tmp
-}
-
-func initFormEtcd() (s *scheduler, err error) {
-	bytes, err := etcd.Get(etcd.Gpus, gpuStatusMapKey)
+func initGpuFormEtcd() (s *gpuScheduler, err error) {
+	bytes, err := etcd.GetValue(etcd.Gpus, gpuStatusMapKey)
 	if err != nil {
 		if xerrors.IsNotExistInEtcdError(err) {
 			err = nil
@@ -131,13 +69,75 @@ func initFormEtcd() (s *scheduler, err error) {
 		}
 	}
 
-	s = &scheduler{
+	s = &gpuScheduler{
 		GpuStatusMap: make(map[string]byte),
 	}
 	if len(bytes) != 0 {
 		err = json.Unmarshal(bytes, &s)
 	}
 	return s, err
+}
+
+// Apply for a specified number of gpus
+func (gs *gpuScheduler) Apply(num int) ([]string, error) {
+	if num <= 0 || num > gs.AvailableGpuNums {
+		return nil, errors.New("num must be greater than 0 and less than " + strconv.Itoa(gs.AvailableGpuNums))
+	}
+
+	gs.Lock()
+	defer gs.Unlock()
+
+	var availableGpus []string
+	for k, v := range gs.GpuStatusMap {
+		if v == 0 {
+			gs.GpuStatusMap[k] = 1
+			availableGpus = append(availableGpus, k)
+			if len(availableGpus) == num {
+				break
+			}
+		}
+	}
+
+	if len(availableGpus) < num {
+		return nil, xerrors.NewGpuNotEnoughError()
+	}
+
+	return availableGpus, nil
+}
+
+// Restore a specified number of gpu
+func (gs *gpuScheduler) Restore(gpus []string) {
+	if len(gpus) <= 0 || len(gpus) > gs.AvailableGpuNums {
+		return
+	}
+
+	gs.Lock()
+	defer gs.Unlock()
+
+	for _, gpu := range gpus {
+		gs.GpuStatusMap[gpu] = 0
+	}
+}
+
+func (gs *gpuScheduler) serialize() *string {
+	gs.RLock()
+	defer gs.RUnlock()
+
+	bytes, _ := json.Marshal(gs)
+	tmp := string(bytes)
+	return &tmp
+}
+
+func (gs *gpuScheduler) GetGpuStatus() map[string]byte {
+	gs.RLock()
+	defer gs.RUnlock()
+
+	copyMap := make(map[string]byte, len(gs.GpuStatusMap))
+	for k, v := range gs.GpuStatusMap {
+		copyMap[k] = v
+	}
+
+	return copyMap
 }
 
 func getAllGpuUUID() ([]*gpu, error) {
