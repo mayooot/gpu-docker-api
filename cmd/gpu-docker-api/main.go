@@ -31,9 +31,9 @@ var (
 )
 
 var (
-	addr      = flag.StringP("addr", "a", "0.0.0.0:2378", "Address of gpu-docker-routers server,format: ip:port")
-	etcdAddr  = flag.StringP("etcd", "e", "0.0.0.0:2379", "Address of etcd server,format: ip:port")
-	portRange = flag.StringP("portRange", "p", "40000-65535", "Port range of docker container,format: startPort-endPort")
+	addr      = flag.StringP("addr", "a", "0.0.0.0:2378", "Address of gpu-docker-routers server, format: ip:port")
+	etcdAddr  = flag.StringP("etcd", "e", "0.0.0.0:2379", "Address of etcd server, format: ip:port")
+	portRange = flag.StringP("portRange", "p", "40000-65535", "Port range of docker container, format: startPort-endPort")
 	logLevel  = flag.StringP("logLevel", "l", "debug", "Log level, optional: release")
 )
 
@@ -84,7 +84,7 @@ func (p *program) Init(svc.Environment) (err error) {
 
 	//  create merges dir, that used to store container merged layer
 	layer := "merges"
-	if err := utils.IsDir(layer); err != nil {
+	if err = utils.IsDir(layer); err != nil {
 		_ = os.Mkdir(layer, 0755)
 		err = nil
 	}
