@@ -70,8 +70,6 @@ which looks pretty cool 😎.
 
 The same is true when updating volume.
 
----
-
 Last but not least, you can see that we're using a ReplicaSet instead of a container, which if you're familiar with K8s,
 you probably already know what that means, you can
 see [ReplicaSet](https://kubernetes.io/zh-cn/docs/concepts/workloads/controllers/replicaset/).
@@ -82,11 +80,13 @@ and implement the function of rollback to the specified version.
 
 # Introduce
 
-juejin: 
+juejin:
+
 * [Docker 二次开发 | NVIDIA Docker + Docker Client 调度 GPU 容器项目](https://juejin.cn/post/7318446251631591475)
 * [使用GPU-Docker-API管理GPU模型容器版本](https://juejin.cn/post/7327100271937519657)
 
 zhihu:
+
 * [Docker 二次开发 | NVIDIA Docker + Docker Client 调度 GPU 容器项目](https://zhuanlan.zhihu.com/p/675478533)
 * [使用GPU-Docker-API管理GPU模型容器版本](https://zhuanlan.zhihu.com/p/679396068)
 
