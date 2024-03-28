@@ -19,6 +19,7 @@ Similar to the operation on container instances in [AutoDL](https://www.autodl.c
 
 - [GPU-Docker-API](#gpu-docker-api)
 - [Overview](#overview)
+- [Introduce](#introduce)
 - [Feature](#feature)
     - [ReplicaSet](#replicaset)
     - [Volume](#volume)
@@ -79,6 +80,16 @@ In this project, ReplicaSet is just a concept, there is no concrete implementati
 container's history version,
 and implement the function of rollback to the specified version.
 
+# Introduce
+
+juejin: 
+* [Docker 二次开发 | NVIDIA Docker + Docker Client 调度 GPU 容器项目](https://juejin.cn/post/7318446251631591475)
+* [使用GPU-Docker-API管理GPU模型容器版本](https://juejin.cn/post/7327100271937519657)
+
+zhihu:
+* [Docker 二次开发 | NVIDIA Docker + Docker Client 调度 GPU 容器项目](https://zhuanlan.zhihu.com/p/675478533)
+* [使用GPU-Docker-API管理GPU模型容器版本](https://zhuanlan.zhihu.com/p/679396068)
+
 # Feature
 
 ## ReplicaSet
@@ -113,6 +124,12 @@ and implement the function of rollback to the specified version.
 
 [👉 Click here to see, my environment](#Environment)
 
+🌱To make your experience easier, we offer there ways to start project.
+
+* Docker
+* Build From Source
+* Download From Release
+
 ## How To Use API
 
 Select any of the following.
@@ -131,12 +148,6 @@ Select any of the following.
 2. **[Optional]** If you want to specify the size of the docker volume, you need to specify the Docker `Storage Driver`
    as `Overlay2`,
    and set the `Docker Root Dir` to the `XFS` file system.
-
----
-> 🌱To make your experience easier, we offer there ways to start project.
-> * Docker
-> * Build From Source
-> * Download From Release
 
 ## Docker
 
