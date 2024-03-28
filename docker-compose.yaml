@@ -46,8 +46,6 @@ services:
             - driver: nvidia
               count: all
               capabilities: [ gpu ]
-    environment:
-      - NVIDIA_VISIBLE_DEVICES=all
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/localtime:/etc/localtime:ro
