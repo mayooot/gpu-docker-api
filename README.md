@@ -26,6 +26,9 @@ Similar to the operation on container instances in [AutoDL](https://www.autodl.c
 - [Quick Start](#quick-start)
     - [How To Use API](#how-to-use-api)
     - [Environmental Preparation](#environmental-preparation)
+    - [Docker](#docker)
+        - [Docker run](#docker-run)
+        - [Docker Compose](#docker-compose)
     - [Build From Source](#build-from-source)
     - [Download From Release](#download-from-release)
     - [Run](#run)
@@ -122,10 +125,52 @@ Select any of the following.
 ## Environmental Preparation
 
 1. The Linux servers has installed NVIDIA GPU drivers, NVIDIA Docker, ETCD V3.
-
-2. [Optional] If you want to specify the size of the docker volume, you need to specify the Docker `Storage Driver`
+   > If you use docker-compose start project, it will start ETCD V3 for you.
+   >
+   > Otherwise, install ETCD V3 the way you like it.
+2. **[Optional]** If you want to specify the size of the docker volume, you need to specify the Docker `Storage Driver`
    as `Overlay2`,
    and set the `Docker Root Dir` to the `XFS` file system.
+
+---
+> 🌱To make your experience easier, we offer there ways to start project.
+> * Docker
+> * Build From Source
+> * Download From Release
+
+## Docker
+
+If you want to change the command at Docker startup, you can refer to [Run](#run).
+
+Just like this:
+
+~~~
+cmd ["/data/gpu-docker-api" "-a", "0.0.0.0:2378", "-e", "0.0.0.0:2379", "-l", "debug", "-p", "40000-65535"]
+~~~
+
+### Docker run
+
+~~~
+$ docker run -d \
+--name=gpu-docker-api \
+--net=host \
+--gpus=all \
+--restart=unless-stopped \
+-v /etc/localtime:/etc/localtime:ro \
+-v /var/run/docker.sock:/var/run/docker.sock \
+-v gpu-docker-api-data:/data/merges
+mayooot/gpu-docker-api:v0.0.3
+~~~
+
+### Docker Compose
+
+~~~
+$ git clone https://github.com/mayooot/gpu-docker-api.git
+$ cd gpu-docker-api
+$ docker-compose -f docker-compose.yaml up -d
+~~~
+
+---
 
 ## Build From Source
 
