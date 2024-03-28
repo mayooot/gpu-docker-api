@@ -18,12 +18,12 @@
     - [卷](#卷)
     - [资源](#资源)
 - [快速开始](#快速开始)
-    - [API](#api)
+    - [如何使用](#如何使用)
     - [环境准备](#环境准备)
     - [使用源码构建](#使用源码构建)
     - [下载发布版本](#下载发布版本)
-    - [配置文件](#配置文件)
     - [运行](#运行)
+    - [如何重置](#如何重置)
 - [架构](#架构)
     - [组件介绍](#组件介绍)
     - [架构图](#架构图)
@@ -58,48 +58,49 @@
 
 ## 副本集
 
-- [x] 创建 GPU 容器
-- [x] 创建无卡容器
-- [x] 升降容器 GPU 配置
-- [x] 升降容器 Volume 配置
-- [x] 停止容器
-- [x] 重启容器
-- [x] 在容器内部执行命令
-- [x] 删除容器
-- [x] 保存容器为镜像
-- [x] 获取容器创建信息
+- [x] 通过副本集运行一个容器
 
-## 卷（Volume）
+- [x]  通过副本集提交容器为镜像
+- [x]  通过副本集在容器中执行命令
+- [x]  通过副本集对容器进行补丁
+- [x]  通过副本集回滚容器
+- [x]  通过副本集停止容器
+- [x]  通过副本集重启容器
+- [x]  通过副本集暂停一个副本集
+- [x]  通过副本集继续一个副本集
+- [x]  获取副本集的版本信息
+- [x]  获取所有副本集的版本信息
+- [x]  通过副本集删除一个容器
 
-- [x] 创建指定容量大小的 Volume
-- [x] 删除 Volume
-- [x] 扩缩容 Volume
-- [x] 获取卷创建信息
+## 卷
 
-## GPU
+- [x] 创建指定容量大小的卷
+- [x]  更新卷
+- [x] 获取卷版本信息
+- [x] 获取卷所有版本信息
+- [x] 删除卷
+
+## 资源
 
 - [x] 查看 GPU 使用情况
-
-## Port
-
-- [x] 查看已使用的 Ports
+- [x] 查看端口使用情况
 
 # 快速开始
 
 [👉点此查看，我的测试环境信息](#Environment)
 
-## API
+## 如何使用
 
-导入 [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) 以调用 api。
+- 将 [gpu-docker-api-en.openapi.json](https://chat.openai.com/c/api%2Fgpu-docker-api-en.openapi.json) 导入到 [ApiFox](https://apifox.com/)。
+- 查看 [gpu-docker-api-en.md](https://chat.openai.com/c/api%2Fgpu-docker-api-en.md)。
+- 查看这个[在线API](https://apifox.com/apidoc/shared-cca36339-a3f1-4f6b-b8fe-4274ef3529ec)，但是它可能随时过期。
+
+从[ApiFox](https://apifox.com)导入 [gpu-docker-api.openapi.json](api%2Fgpu-docker-api.openapi.json) 以调用 api。
 
 ## 环境准备
 
-1. 测试环境已经安装了NVIDIA显卡的相应驱动程序。
-2. 确保你的测试环境上安装了[NVIDIA Docker Installation](https://zhuanlan.zhihu.com/p/361934132)。
-3. 为了支持创建指定容量大小的卷，确保Docker的存储驱动是Overlay2。创建并格式化一个分区为XFS文件系统，并使用挂载的目录作为Docker
-   Root
-   Dir。教程：[volume-size-scale-en.md](https://github.com/mayooot/gpu-docker-api/blob/main/docs%2Fvolume%2Fvolume-size-scale-en.md)
-4. 确保你的测试环境安装了ETCD V3，安装教程：[ETCD](https://github.com/etcd-io/etcd)。
+1. Linux 服务器已安装了 NVIDIA GPU 驱动程序、NVIDIA Docker 和 ETCD V3。
+2. [可选] 如果您想指定 Docker 卷的大小，您需要将 Docker 的 `Storage Driver` 设置为 `Overlay2`，并将 `Docker Root Dir` 设置为 `XFS` 文件系统。
 
 ## 使用源码构建
 
@@ -113,33 +114,44 @@ make build
 
 [release](https://github.com/mayooot/gpu-docker-api/releases)
 
-## 配置文件
-
-如果您从 发布版 下载了可执行文件，您应该手动下载 config.toml 并创建 etc 目录。
-
-目录结构如下：
-
-~~~
-$ tree
-.
-├── etc
-│   └── config.toml
-└── gpu-docker-api-linux-amd64
-
-1 目录，2 文件
-~~~
-
-然后按照您想要的方式进行更改。
-
-~~~
-vim etc/config.yaml
-~~~
-
 ## 运行
 
-~~~
+您可以使用 `-h` 参数获取帮助信息和默认配置。
+
+```bash
+$ ./gpu-docker-api-linux-amd64 -h
+GPU-DOCKER-API
+ BRANCH: feat/union-patch-and-version-control
+ Version: v0.0.2-12-gc29670a
+ COMMIT: c29670a1dfa8bc5470e282ce9b214398baab3a15
+ GoVersion: go1.21.4
+ BuildTime: 2024-01-23T13:55:51+0800
+
+Usage of ./gpu-docker-api-linux-amd64:
+  -a, --addr string        Address of gpu-docker-routers server,format: ip:port (default "0.0.0.0:2378")
+  -e, --etcd string        Address of etcd server,format: ip:port (default "0.0.0.0:2379")
+  -l, --logLevel string    Log level, optional: release (default "debug")
+  -p, --portRange string   Port range of docker container,format: startPort-endPort (default "40000-65535")
+pflag: help requested
+```
+
+使用它。
+
+~~~bash
 ./gpu-docker-api-${your_os}-amd64
 ~~~
+
+## 如何重置
+
+如您所知，我们将一些信息保存在 etcd 和本地，因此当您想要删除它们时，可以使用这个 [reset.sh](https://chat.openai.com/c/scripts%2Freset.sh) 脚本。
+
+或者，如果您从发布版本下载了可执行文件，您可以使用以下命令获取它并将其放置在可执行文件所在的位置。
+
+```bash
+wget https://github.com/mayooot/gpu-docker-api/blob/main/scripts/reset.sh
+```
+
+
 
 # 架构
 
@@ -151,43 +163,47 @@ vim etc/config.yaml
 
 ## 组件介绍
 
-* gin：处理 HTTP 请求和接口路由。
 
-* docker-client：和服务器的 Docker 交互。
 
-* workQueue：异步处理任务，例如：
+- gin：处理 HTTP 请求和接口路由。
 
-    * 创建 Container/Volume 后，将创建的全量信息添加到 ETCD。
-    * 删除 Container/Volume 后，删除 ETCD 中关于资源的全量信息。
-    * 升降 Container 的 GPU/Volume 配置后，将旧 Container 的数据拷贝到新 Container 中。
-    * 升降 Volume 资源的容量大小后，将旧 Volume 的数据拷贝到新的 Volume 中。
+- docker-client：与 Docker 服务器交互。
 
-* container/volume VersionMap：
+- workQueue：异步处理任务，例如：
 
-    * 创建 Container 时生成版本号，默认为 0，当 Container 被更新后，版本号＋1。
-    * 创建 Volume 时生成版本号，默认为 0，当 Volume 被更新后，版本号＋1。
+  - 当创建容器/卷时，将创建的信息添加到 ETCD 中。
 
-* gpuScheduler：分配 GPU 资源的调度器，将容器使用 GPU 的占用情况保存到 gpuStatusMap。
-    * gpuStatusMap：
-      维护服务器的 GPU 资源，当程序第一次启动时，调用 `nvidia-smi` 获取全部的 GPU 资源，并初始化 gpuStatusMap，Key 为 GPU 的
-      UUID，Value 为 使用情况，0 代表未占用，1 代表已占用。
+  - 删除容器/卷后，从 ETCD 中删除有关资源的全部信息。
 
-* portScheduler：分配 Port 资源的调度器，将容器使用的 Port 资源保存到 usedPortSet。
-    * usedPortSet:
-      维护服务器的端口资源。已经使用的端口将被添加到这个 Set 中。。
+- container/volume VersionMap：
 
-* docker：实际创建资源（如容器、卷等）的组件。为了调度 GPU，需要 [NVIDIA
-  Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) 容器工具包。
+  - 创建容器时生成版本号，默认为 1，当更新容器时，版本号会增加 1。
 
-* etcd：保存 Container/Volume的全量创建信息，以及生成 mod_revision 等 Version 字段用于回滚资源的历史版本。存储在 ETCD
-  中资源如下：
+  - 创建卷时生成版本号，默认为 1，当更新卷时，版本号会增加 1。
 
-    * /apis/v1/containers
-    * /apis/v1/volumes
-    * /apis/v1/gpus/gpuStatusMapKey
-    * /apis/v1/ports/usedPortSetKey
-    * /apis/v1/versions/containerVersionMapKey
-    * /apis/v1/versions/volumeVersionMapKey
+- gpuScheduler：分配 GPU 资源并保存已使用的 GPU 的调度程序。
+  - gpuStatusMap： 维护服务器的 GPU 资源，在程序首次启动时，调用 `nvidia-smi` 获取所有 GPU 资源，并初始化 gpuStatusMap。 键是 GPU 的 UUID，值是使用情况，0 表示已用，1 表示未使用。
+
+- portScheduler：分配端口资源并保存已使用的端口的调度程序。
+  - usedPortSet： 维护服务器的端口资源。已使用的端口将添加到此集合中。
+
+- docker：实际创建容器、卷等资源的组件。使用 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html) 以便调度 GPU。
+
+- etcd：保存容器/卷创建信息。当前正在使用以下键：
+
+  - /gpu-docker-api/apis/v1/containers
+
+  - /gpu-docker-api/apis/v1/volumes
+
+  - /gpu-docker-api/apis/v1/gpus/gpuStatusMapKey
+
+  - /gpu-docker-api/apis/v1/ports/usedPortSetKey
+
+  - /gpu-docker-api/apis/v1/merges/containerMergeMapKey
+
+  - /gpu-docker-api/apis/v1/versions/containerVersionMapKey
+
+  - /gpu-docker-api/apis/v1/versions/volumeVersionMapKey
 
 ## 架构图
 
