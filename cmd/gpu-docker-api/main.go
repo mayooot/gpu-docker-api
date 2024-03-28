@@ -100,7 +100,14 @@ func (p *program) Start() error {
 	)
 
 	fmt.Printf("CONFIG\n addr: %s\n etcdAddr: %s\n portRange: %s\n logLevel: %s\n\n", *addr, *etcdAddr, *portRange, *logLevel)
-	log.Info("gpu-docker-routers started successfully!")
+	log.Infof("The number of available gpus is %d", schedulers.GpuScheduler.AvailableGpuNums)
+	log.Infof("The range of available ports is %d-%d, and the available number is %d",
+		schedulers.PortScheduler.StartPort,
+		schedulers.PortScheduler.EndPort,
+		schedulers.PortScheduler.AvailableCount,
+	)
+
+	log.Info("gpu-docker-api started successfully!")
 
 	gin.SetMode(*logLevel)
 	r := gin.New()
