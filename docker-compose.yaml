@@ -1,0 +1,54 @@
+version: '3.5'
+
+networks:
+  etcd-net:
+    name: etcd-net
+
+volumes:
+  etcd-data:
+    name: etcd-data
+  gpu-docker-api-data:
+    name: gpu-docker-api-data
+
+services:
+  etcd:
+    hostname: etcd
+    image: bitnami/etcd:3.4.28
+    container_name: etcd
+    restart: unless-stopped
+    networks:
+      - etcd-net
+    environment:
+      - "ETCD_ADVERTISE_CLIENT_URLS=http://0.0.0.0:2379"
+      - "ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379"
+      - "ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380"
+      - "ETCD_INITIAL_ADVERTISE_PEER_URLS=http://0.0.0.0:2380"
+      - "ALLOW_NONE_AUTHENTICATION=yes"
+      - "ETCD_INITIAL_CLUSTER=node1=http://0.0.0.0:2380"
+      - "ETCD_NAME=node1"
+      - "ETCD_DATA_DIR=/opt/bitnami/etcd/data"
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - etcd-data:/bitnami/etcd/data
+
+  gpu-docker-api:
+    hostname: gpu-docker-api
+    image: mayooot/gpu-docker-api:v0.0.3
+    container_name: gpu-docker-api
+    restart: unless-stopped
+    network_mode: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+      - gpu-docker-api-data:/data/merges
