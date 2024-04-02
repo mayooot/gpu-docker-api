@@ -26,4 +26,4 @@ COPY --from=builder /build/bin/gpu-docker-api-linux-amd64 /data/gpu-docker-api
 
 EXPOSE 2378
 
-CMD ["/data/gpu-docker-api"]
+ENTRYPOINT ["./gpu-docker-api"]
