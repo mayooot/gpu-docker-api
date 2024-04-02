@@ -2,6 +2,7 @@
 
 ![license](https://img.shields.io/hexpm/l/plug.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)
+[![docker](https://img.shields.io/docker/pulls/mayooot/gpu-docker-api.svg)](https://hub.docker.com/r/mayooot/gpu-docker-api)
 
 [简体中文](docs%2Fzh-cn.md)
 > ⚠️注意：中文文档可能落后于英文文档，请以英文文档为准。
