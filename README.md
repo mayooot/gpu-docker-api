@@ -152,14 +152,6 @@ Select any of the following.
 
 ## Docker
 
-If you want to change the command at Docker startup, you can refer to [Run](#run).
-
-Just like this:
-
-~~~
-cmd ["/data/gpu-docker-api" "-a", "0.0.0.0:2378", "-e", "0.0.0.0:2379", "-l", "debug", "-p", "40000-65535"]
-~~~
-
 ### Docker run
 
 ~~~
@@ -170,8 +162,25 @@ $ docker run -d \
 --restart=unless-stopped \
 -v /etc/localtime:/etc/localtime:ro \
 -v /var/run/docker.sock:/var/run/docker.sock \
--v gpu-docker-api-data:/data/merges
+-v gpu-docker-api-data:/data/merges \
 mayooot/gpu-docker-api:v0.0.3
+~~~
+
+If you want to change the command at Docker startup, you can refer to [Run](#run).
+
+Just like this:
+
+~~~
+$ docker run -d \
+--name=gpu-docker-api \
+--net=host \
+--gpus=all \
+--restart=unless-stopped \
+-v /etc/localtime:/etc/localtime:ro \
+-v /var/run/docker.sock:/var/run/docker.sock \
+-v gpu-docker-api-data:/data/merges \
+mayooot/gpu-docker-api:v0.0.3 \
+--addr 0.0.0.0:2378 --etcd 0.0.0.0:2379 --logLevel debug --portRange 40000-65535
 ~~~
 
 ### Docker Compose
