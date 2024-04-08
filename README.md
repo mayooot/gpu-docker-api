@@ -93,7 +93,9 @@ zhihu:
 
 # Feature
 
-## ReplicaSet
+## Backend
+
+### ReplicaSet
 
 - [x] Run a container via replicaSet
 - [x] Commit container as an image via replicaSet
@@ -108,7 +110,7 @@ zhihu:
 - [x] Get all version info about replicaSet
 - [x] Delete a container via replicaSet
 
-## Volume
+### Volume
 
 - [x] Create a volume
 - [x] Patch a volume
@@ -116,10 +118,28 @@ zhihu:
 - [x] Get all version info about a volume
 - [x] Delete a volume
 
-## Resource
+### Resource
 
 - [x] Get gpu usage status
 - [x] Get port usage status
+
+## Frontend
+
+### Main Interface
+
+- [ ] Container Creation Button (Jumps to the container creation interface)
+- [ ] Container Status Display Card (Displays how many containers you have created, whether they are running, power consumption, etc.)
+- [ ] Host Machine Status Display Card (Displays information about the host machine, such as memory usage, CPU usage, etc.)
+- [ ] Data Display Card (Like AutoDL, data is not stored in containers)
+
+### Control Panel
+
+- [ ] GPU Model Selection
+- [ ] Number of GPUs Selection
+- [ ] Data Disk Size Selection
+- [ ] Instance Number Selection
+- [ ] Create Button
+- [ ] Modify Button (Pressing the modify button does not create a new container, but rebuilds the container set in "Instance Number" with new parameter settings)
 
 # Quick Start
 
