@@ -1,4 +1,4 @@
-# GPU-Docker-API
+# gpu-docker-api
 
 ![license](https://img.shields.io/hexpm/l/plug.svg)
 [![Go Report Card](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)](https://goreportcard.com/badge/github.com/mayooot/gpu-docker-api)
@@ -7,18 +7,24 @@
 [简体中文](docs%2Fzh-cn.md)
 > ⚠️注意：中文文档可能落后于英文文档，请以英文文档为准。
 
-Try to keep it simple.
+Lightweight GPU container management for small AI labs: Docker-level GPU
+scheduling without the operational cost of Kubernetes.
 
-# Overview
+# Why
 
-Use the Docker Client to invoke NVIDIA Docker to realize the business functions of GPU container.
+Small labs often share a handful of GPU machines. Kubernetes can be excessive,
+while raw `docker run --gpus` leaves container changes and configuration history
+to be managed by hand. gpu-docker-api sits in between:
 
-For example, lifting GPU container configurations, starting containers without cards, and scaling up and
-down volume size.
+- Manage GPU containers and volumes through a REST API
+- Start a container with zero GPUs and change its allocation later through a versioned replacement
+- Store configuration and version history in etcd, with rollback to an earlier container version
+- Preserve installed software and mounted data across configuration changes
 
-Similar to the operation on container instances in [AutoDL](https://www.autodl.com/docs/env/).
+See the [architecture diagram](docs%2Fdesign.png) and [component overview](#architecture).
 
-- [GPU-Docker-API](#gpu-docker-api)
+- [gpu-docker-api](#gpu-docker-api)
+- [Why](#why)
 - [Overview](#overview)
 - [Introduce](#introduce)
 - [Feature](#feature)
@@ -41,6 +47,8 @@ Similar to the operation on container instances in [AutoDL](https://www.autodl.c
     - [Documents](#documents)
 - [Contribute](#contribute)
 - [Environment](#environment)
+
+# Overview
 
 First I have to describe to you what a GPU container's directory should look like when it starts. It is as follows:
 
@@ -466,4 +474,3 @@ Sat Dec  9 09:04:06 2023
 |    4   N/A  N/A    ******      C   ******                            *****MiB |
 +-----------------------------------------------------------------------------+
 ~~~
-
