@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
+	"github.com/mayooot/gpu-docker-api/internal/workQueue"
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
@@ -82,7 +83,6 @@ func (ps *portScheduler) Apply(num int) ([]string, error) {
 	var availablePorts []string
 	for i := ps.StartPort; i <= ps.EndPort; i++ {
 		if _, ok := ps.UsedPortSet[strconv.Itoa(i)]; !ok {
-			ps.UsedPortSet[strconv.Itoa(i)] = struct{}{}
 			availablePorts = append(availablePorts, strconv.Itoa(i))
 			if len(availablePorts) == num {
 				break
@@ -90,9 +90,15 @@ func (ps *portScheduler) Apply(num int) ([]string, error) {
 		}
 	}
 
+	// only mark ports as used when the request can be fully satisfied,
+	// otherwise a failed request would leak the ports it had already picked
 	if len(availablePorts) < num {
 		return nil, xerrors.NewPortNotEnoughError()
 	}
+	for _, p := range availablePorts {
+		ps.UsedPortSet[p] = struct{}{}
+	}
+	ps.persistLocked()
 
 	return availablePorts, nil
 }
@@ -109,6 +115,19 @@ func (ps *portScheduler) Restore(ports []string) {
 	for _, port := range ports {
 		delete(ps.UsedPortSet, port)
 	}
+	ps.persistLocked()
+}
+
+// persistLocked enqueues a snapshot to etcd. It must be called with the lock held,
+// so that snapshots reach etcd in the same order as the mutations.
+func (ps *portScheduler) persistLocked() {
+	bytes, _ := json.Marshal(ps)
+	tmp := string(bytes)
+	workQueue.Enqueue(etcd.PutKeyValue{
+		Resource: etcd.Ports,
+		Key:      usedPortSetKey,
+		Value:    &tmp,
+	})
 }
 
 func (ps *portScheduler) serialize() *string {

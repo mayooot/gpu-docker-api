@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/docker/docker/api/types/filters"
@@ -42,29 +41,23 @@ func (vs *VolumeService) CreateVolume(spec *models.VolumeCreate) (resp volume.Vo
 		return resp, errors.WithMessage(err, "services.createVolume failed")
 	}
 
-	workQueue.Queue <- etcd.PutKeyValue{
+	workQueue.Enqueue(etcd.PutKeyValue{
 		Resource: etcd.Volumes,
 		Key:      kv.Key,
 		Value:    kv.Value,
-	}
+	})
 	return
 }
 
 // It will only be executed based on the `docker.client.ContainerCreate`
 func (vs *VolumeService) createVolume(ctx context.Context, name string, info models.EtcdVolumeInfo) (resp volume.Volume, kv etcd.PutKeyValue, err error) {
 	// set the version number
-	version, _ := vmap.VolumeVersionMap.Get(name)
-	version = version + 1
-	vmap.VolumeVersionMap.Set(name, version)
+	version := vmap.VolumeVersionMap.Next(name)
 
 	defer func() {
-		// if run container failed, clear the version number
+		// if create volume failed, roll back the version number
 		if err != nil {
-			if version == 1 {
-				vmap.VolumeVersionMap.Remove(name)
-			} else {
-				vmap.VolumeVersionMap.Set(name, version-1)
-			}
+			vmap.VolumeVersionMap.Revert(name, version)
 		}
 	}()
 
@@ -98,14 +91,14 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *models.VolumeSize) (
 	// get the latest version number
 	version, ok := vmap.VolumeVersionMap.Get(name)
 	if !ok {
-		return resp, errors.Errorf("container: %s version: %d not found in ContainerVersionMap", name, version)
+		return resp, errors.Errorf("volume: %s version: %d not found in VolumeVersionMap", name, version)
 	}
 	volVersionName := fmt.Sprintf("%s-%d", name, version)
 
 	ctx := context.Background()
 	infoBytes, err := etcd.GetValue(etcd.Volumes, name)
 	if err != nil {
-		return resp, errors.Wrapf(err, "etcd.GetValue failed, key: %s", etcd.ResourcePrefix(etcd.Containers, name))
+		return resp, errors.Wrapf(err, "etcd.GetValue failed, key: %s", etcd.ResourcePrefix(etcd.Volumes, name))
 	}
 	var info models.EtcdVolumeInfo
 	if err = json.Unmarshal(infoBytes, &info); err != nil {
@@ -146,9 +139,11 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *models.VolumeSize) (
 		return resp, errors.WithMessage(err, "services.createVolume failed")
 	}
 
-	err = utils.CopyOldMountPointToContainerMountPoint(resp.Name, resp.Name)
+	// copy data from the old volume (e.g. foo-1) to the new one (e.g. foo-2).
+	// Earlier versions passed resp.Name for both arguments, so the data was never copied.
+	err = utils.CopyOldMountPointToContainerMountPoint(volVersionName, resp.Name)
 	if err != nil {
-		return resp, errors.WithMessage(err, "utils.CopyOldMergedToNewContainerMerged failed")
+		return resp, errors.WithMessage(err, "utils.CopyOldMountPointToContainerMountPoint failed")
 	}
 
 	// delete the old volume
@@ -157,11 +152,11 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *models.VolumeSize) (
 		return resp, errors.WithMessage(err, "services.DeleteVolume failed")
 	}
 
-	workQueue.Queue <- etcd.PutKeyValue{
+	workQueue.Enqueue(etcd.PutKeyValue{
 		Resource: etcd.Volumes,
 		Key:      kv.Key,
 		Value:    kv.Value,
-	}
+	})
 
 	log.Infof("services.PatchVolumeSize, volume size patched successfully, old name: %s, old size: %s, new name: %s, new size: %s",
 		name, preSize, resp.Name, patchSize)
@@ -171,6 +166,9 @@ func (vs *VolumeService) PatchVolumeSize(name string, spec *models.VolumeSize) (
 // DeleteVolume deletes a specific version of volume or the latest version of volume.
 // If deleteRecord is true, etcd info about this volume and VolumeVersionMap record are deleted.
 func (vs *VolumeService) DeleteVolume(name string, isLatest, deleteRecord bool) error {
+	// name is the volume name without version (e.g. "foo") when isLatest is true,
+	// otherwise it is the versioned name (e.g. "foo-2").
+	baseName := name
 	if isLatest {
 		// get the last version number
 		version, ok := vmap.VolumeVersionMap.Get(name)
@@ -178,14 +176,18 @@ func (vs *VolumeService) DeleteVolume(name string, isLatest, deleteRecord bool) 
 			return errors.Errorf("volume: %s version: %d not found in VolumeVersionMap", name, version)
 		}
 		name = fmt.Sprintf("%s-%d", name, version)
+	} else {
+		baseName = trimVersionSuffix(name)
 	}
 	if deleteRecord {
-		log.Infof("services.DeleteVolume, volume: %s will be del etcd info and version record", name)
-		vmap.VolumeVersionMap.Remove(strings.Split(name, "-")[0])
-		workQueue.Queue <- etcd.DelKey{
+		// Earlier versions used strings.Split(name, "-")[0], which breaks names containing "-",
+		// and deleted the etcd key "foo-2" while the record is stored under "foo".
+		log.Infof("services.DeleteVolume, volume: %s will be del etcd info and version record", baseName)
+		vmap.VolumeVersionMap.Remove(baseName)
+		workQueue.Enqueue(etcd.DelKey{
 			Resource: etcd.Volumes,
-			Key:      name,
-		}
+			Key:      baseName,
+		})
 	}
 
 	err := docker.Cli.VolumeRemove(context.TODO(), name, true)

@@ -92,11 +92,11 @@ func (rs *ReplicaSetService) RunGpuContainer(spec *models.ContainerRun) (id, con
 		return id, containerName, errors.Wrapf(err, "serivce.runContainer failed, spec: %+v", spec)
 	}
 
-	workQueue.Queue <- etcd.PutKeyValue{
+	workQueue.Enqueue(etcd.PutKeyValue{
 		Resource: etcd.Containers,
 		Key:      kv.Key,
 		Value:    kv.Value,
-	}
+	})
 	return
 }
 
@@ -121,12 +121,13 @@ func (rs *ReplicaSetService) DeleteContainer(name string) error {
 	}
 	schedulers.PortScheduler.Restore(ports)
 
-	// delete the version number and asynchronously delete the container info in etcd
-	vmap.ContainerVersionMap.Remove(strings.Split(name, "-")[0])
-	workQueue.Queue <- etcd.DelKey{
+	// delete the version number and asynchronously delete the container info in etcd.
+	// name is already the replicaSet name, splitting it on "-" broke names like "my-model".
+	vmap.ContainerVersionMap.Remove(name)
+	workQueue.Enqueue(etcd.DelKey{
 		Resource: etcd.Containers,
 		Key:      name,
-	}
+	})
 
 	err = docker.Cli.ContainerRemove(context.TODO(),
 		fmt.Sprintf("%s-%d", name, version),
@@ -170,10 +171,12 @@ func (rs *ReplicaSetService) ExecuteContainer(name string, exec *models.Containe
 	}
 
 	hijackedResp, err := docker.Cli.ContainerExecAttach(ctx, execCreate.ID, types.ExecStartCheck{})
-	defer hijackedResp.Close()
 	if err != nil {
 		return resp, errors.Wrapf(err, "docker.ContainerExecAttach failed, name: %s, spec: %+v", name, exec)
 	}
+	// Close must be deferred after the error check: on failure hijackedResp.Conn is nil
+	// and Close would panic.
+	defer hijackedResp.Close()
 
 	var buf bytes.Buffer
 	_, _ = stdcopy.StdCopy(&buf, &buf, hijackedResp.Reader)
@@ -238,11 +241,11 @@ func (rs *ReplicaSetService) PatchContainer(name string, spec *models.PatchReque
 		return id, newContainerName, errors.WithMessage(err, "DeleteContainerForUpdate failed")
 	}
 
-	workQueue.Queue <- etcd.PutKeyValue{
+	workQueue.Enqueue(etcd.PutKeyValue{
 		Resource: etcd.Containers,
 		Key:      kv.Key,
 		Value:    kv.Value,
-	}
+	})
 
 	log.Infof("services.PatchContainer, container: %s patch configuration successfully", name)
 	return
@@ -270,8 +273,25 @@ func (rs *ReplicaSetService) RollbackContainer(name string, spec *models.Rollbac
 
 	// compare gpu info
 	ctrVersionName := fmt.Sprintf("%s-%d", name, version)
+	targetGpuCount := 0
+	if len(info.HostConfig.Resources.DeviceRequests) > 0 {
+		// the target version may be a cardless container, indexing [0] directly would panic
+		targetGpuCount = len(info.HostConfig.Resources.DeviceRequests[0].DeviceIDs)
+	}
+	// The DeviceIDs recorded in the target version are historical and may already be
+	// allocated to other containers. Start from the gpus currently held by this replicaSet,
+	// then grow or shrink to the target count.
+	currentUUIDs, err := rs.containerDeviceRequestsDeviceIDs(ctrVersionName)
+	if err != nil {
+		return "", errors.WithMessage(err, "services.containerDeviceRequestsDeviceIDs failed")
+	}
+	if len(currentUUIDs) > 0 {
+		info.HostConfig.Resources = rs.newContainerResource(currentUUIDs)
+	} else {
+		info.HostConfig.Resources = container.Resources{}
+	}
 	info, err = rs.patchGpu(ctrVersionName, &models.GpuPatch{
-		GpuCount: len(info.HostConfig.Resources.DeviceRequests[0].DeviceIDs),
+		GpuCount: targetGpuCount,
 	}, info)
 	if err != nil {
 		return "", errors.WithMessage(err, "patchGpu failed")
@@ -283,8 +303,10 @@ func (rs *ReplicaSetService) RollbackContainer(name string, spec *models.Rollbac
 		return "", errors.WithMessage(err, "runContainer failed")
 	}
 
-	// copy the old container's merged files to the new container
-	src, ok := vmap.ContainerMergeMap.Get(info.Version)
+	// copy the target version's merged files to the new container.
+	// info.ContainerName is the versioned name of the target (e.g. "foo-2"), which is the key
+	// used by setToMergeMap. Keying by the bare version number mixed up different replicaSets.
+	src, ok := vmap.ContainerMergeMap.Get(info.ContainerName)
 	if !ok {
 		return "", errors.Errorf("container: %s version: %d merge path not found in ContainerMergeMap", info.ContainerName, info.Version)
 	}
@@ -310,11 +332,11 @@ func (rs *ReplicaSetService) RollbackContainer(name string, spec *models.Rollbac
 		return "", errors.WithMessage(err, "DeleteContainerForUpdate failed")
 	}
 
-	workQueue.Queue <- etcd.PutKeyValue{
+	workQueue.Enqueue(etcd.PutKeyValue{
 		Resource: etcd.Containers,
 		Key:      kv.Key,
 		Value:    kv.Value,
-	}
+	})
 
 	log.Infof("services.RollbackContainer, container: %s patch configuration successfully", ctrVersionName)
 	return newContainerName, nil
@@ -457,7 +479,7 @@ func setToMergeMap(name string, version int64) error {
 	var err error
 	defer func() {
 		if err != nil {
-			vmap.ContainerMergeMap.Remove(version)
+			vmap.ContainerMergeMap.Remove(name)
 		}
 	}()
 
@@ -467,14 +489,14 @@ func setToMergeMap(name string, version int64) error {
 	}
 	layer := "merges"
 	dir, _ := os.Getwd()
-	path := filepath.Join(dir, layer, strings.Split(name, "-")[0], name)
+	path := filepath.Join(dir, layer, trimVersionSuffix(name), name)
 	_ = os.MkdirAll(path, 0755)
 
 	err = utils.CopyDir(mergedDir, path)
 	if err != nil {
-		return errors.WithMessagef(err, "utils.CopyDir failed, container: %s", name)
+		return errors.WithMessagef(err, "utils.CopyDir failed, container: %s, version: %d", name, version)
 	}
-	vmap.ContainerMergeMap.Set(version, path)
+	vmap.ContainerMergeMap.Set(name, path)
 	return nil
 }
 
@@ -557,11 +579,11 @@ func (rs *ReplicaSetService) RestartContainer(name string) (id, newContainerName
 		return id, newContainerName, errors.WithMessage(err, "DeleteContainerForUpdate failed")
 	}
 
-	workQueue.Queue <- etcd.PutKeyValue{
+	workQueue.Enqueue(etcd.PutKeyValue{
 		Resource: etcd.Containers,
 		Key:      kv.Key,
 		Value:    kv.Value,
-	}
+	})
 
 	log.Infof("services.RestartContainer, container restart successfully, "+
 		"old container name: %s, new container name: %s, "+
@@ -634,9 +656,7 @@ func (rs *ReplicaSetService) GetContainerHistory(name string) ([]*models.Contain
 // It will only be executed based on the `docker.client.ContainerCreate`
 func (rs *ReplicaSetService) runContainer(ctx context.Context, name string, info *models.EtcdContainerInfo) (string, string, etcd.PutKeyValue, error) {
 	// set the version number
-	version, _ := vmap.ContainerVersionMap.Get(name)
-	version = version + 1
-	vmap.ContainerVersionMap.Set(name, version)
+	version := vmap.ContainerVersionMap.Next(name)
 
 	// add the version number to the env
 	isExist := false
@@ -651,28 +671,32 @@ func (rs *ReplicaSetService) runContainer(ctx context.Context, name string, info
 		info.Config.Env = append(info.Config.Env, fmt.Sprintf("CONTAINER_VERSION=%d", version))
 	}
 
-	var err error
+	var (
+		err          error
+		appliedPorts []string
+	)
 	defer func() {
-		// if run container failed, clear the version number
+		// if run container failed, roll back the version number and release the ports.
+		// Earlier versions declared err with := inside the port block, so a port failure
+		// skipped this rollback, and ports applied before a create/start failure were leaked.
 		if err != nil {
-			if version == 1 {
-				vmap.ContainerVersionMap.Remove(name)
-			} else {
-				vmap.ContainerVersionMap.Set(name, version-1)
+			vmap.ContainerVersionMap.Revert(name, version)
+			if len(appliedPorts) > 0 {
+				schedulers.PortScheduler.Restore(appliedPorts)
 			}
 		}
 	}()
 
 	// apply for some host port
-	if info.HostConfig.PortBindings != nil && len(info.HostConfig.PortBindings) > 0 {
-		availableOSPorts, err := schedulers.PortScheduler.Apply(len(info.HostConfig.PortBindings))
+	if len(info.HostConfig.PortBindings) > 0 {
+		appliedPorts, err = schedulers.PortScheduler.Apply(len(info.HostConfig.PortBindings))
 		if err != nil {
 			return "", "", etcd.PutKeyValue{}, errors.Wrapf(err, "Portscheduler.Apply failed, info: %+v", info)
 		}
 		var index int
 		for k := range info.HostConfig.PortBindings {
 			info.HostConfig.PortBindings[k] = []nat.PortBinding{{
-				HostPort: availableOSPorts[index],
+				HostPort: appliedPorts[index],
 			}}
 			index++
 		}

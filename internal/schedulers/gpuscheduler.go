@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/mayooot/gpu-docker-api/internal/etcd"
+	"github.com/mayooot/gpu-docker-api/internal/workQueue"
 	"github.com/mayooot/gpu-docker-api/internal/xerrors"
 )
 
@@ -90,7 +91,6 @@ func (gs *gpuScheduler) Apply(num int) ([]string, error) {
 	var availableGpus []string
 	for k, v := range gs.GpuStatusMap {
 		if v == 0 {
-			gs.GpuStatusMap[k] = 1
 			availableGpus = append(availableGpus, k)
 			if len(availableGpus) == num {
 				break
@@ -98,9 +98,15 @@ func (gs *gpuScheduler) Apply(num int) ([]string, error) {
 		}
 	}
 
+	// only mark gpus as used when the request can be fully satisfied,
+	// otherwise a failed request would leak the gpus it had already picked
 	if len(availableGpus) < num {
 		return nil, xerrors.NewGpuNotEnoughError()
 	}
+	for _, k := range availableGpus {
+		gs.GpuStatusMap[k] = 1
+	}
+	gs.persistLocked()
 
 	return availableGpus, nil
 }
@@ -117,6 +123,21 @@ func (gs *gpuScheduler) Restore(gpus []string) {
 	for _, gpu := range gpus {
 		gs.GpuStatusMap[gpu] = 0
 	}
+	gs.persistLocked()
+}
+
+// persistLocked enqueues a snapshot to etcd. It must be called with the lock held,
+// so that snapshots reach etcd in the same order as the mutations.
+// Earlier versions only wrote the state back on graceful shutdown,
+// so a crash would forget every gpu allocated since startup.
+func (gs *gpuScheduler) persistLocked() {
+	bytes, _ := json.Marshal(gs)
+	tmp := string(bytes)
+	workQueue.Enqueue(etcd.PutKeyValue{
+		Resource: etcd.Gpus,
+		Key:      gpuStatusMapKey,
+		Value:    &tmp,
+	})
 }
 
 func (gs *gpuScheduler) serialize() *string {
