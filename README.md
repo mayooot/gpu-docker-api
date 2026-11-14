@@ -23,8 +23,33 @@ to be managed by hand. gpu-docker-api sits in between:
 
 See the [architecture diagram](docs%2Fdesign.png) and [component overview](#architecture).
 
+# Project Status
+
+This project started as a **proof of concept**: can a GPU container keep everything the user changed
+(installed packages, dotfiles, data) when its GPU count or volume size is changed, without Kubernetes?
+The answer it demonstrates is yes — create a new container with the new config, and copy the old container's
+Overlay2 merged layer into it. Container versioning, GPU / port scheduling and etcd-backed rollback were built
+around that core idea.
+
+It is now in **maintenance mode**: correctness fixes are welcome, large new features are not planned.
+
+Known limitations, by design of a single-host PoC:
+
+- Single host only. GPU, port and layer state are bound to the machine running the API.
+- The whole merged layer (image layers included) is copied on each update, so big images make updates slow
+  and use extra disk. Copying only the container's `UpperDir` would be cheaper.
+- A stopped container's merged layer is not mounted, so restarting a stopped container may not carry its
+  files over.
+- State is persisted to etcd on every change, but it is not reconciled against `docker ps` on startup.
+
+Recent fixes (2026-11): volume resize now copies data from the old volume; hidden files are no longer skipped
+when copying layers; version / merge maps are safe under concurrent requests and no longer mix up replicaSets
+with the same version; GPU / port state survives a crash; failed allocations no longer leak GPUs or ports;
+etcd writes are applied in order; graceful shutdown actually stops the work queue; names containing `-` work.
+
 - [gpu-docker-api](#gpu-docker-api)
 - [Why](#why)
+- [Project Status](#project-status)
 - [Overview](#overview)
 - [Introduce](#introduce)
 - [Feature](#feature)

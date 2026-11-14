@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	goflag "flag"
 	"fmt"
+	"net/http"
 	"os"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/judwhite/go-svc"
@@ -38,8 +41,10 @@ var (
 )
 
 type program struct {
-	ctx context.Context
-	wg  sync.WaitGroup
+	ctx    context.Context
+	cancel context.CancelFunc
+	wg     sync.WaitGroup
+	srv    *http.Server
 }
 
 func main() {
@@ -53,7 +58,7 @@ func main() {
 func (p *program) Init(svc.Environment) (err error) {
 	flag.CommandLine.AddGoFlagSet(goflag.CommandLine)
 	flag.Parse()
-	p.ctx = context.Background()
+	p.ctx, p.cancel = context.WithCancel(context.Background())
 	log.SetLevelByString(*logLevel)
 
 	if err = docker.InitDockerClient(); err != nil {
@@ -123,26 +128,46 @@ func (p *program) Start() error {
 	vh.RegisterRoute(apiv1)
 	gh.RegisterRoute(apiv1)
 
+	p.srv = &http.Server{Addr: *addr, Handler: r}
 	go func() {
-		_ = r.Run(*addr)
+		if err := p.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("http server exited: %v", err)
+		}
 	}()
 
+	p.wg.Add(1)
 	go workQueue.SyncLoop(p.ctx, &p.wg)
 
 	return nil
 }
 
+// Stop shuts down in dependency order:
+//  1. stop accepting requests and wait for in-flight handlers, so nothing enqueues new work;
+//  2. cancel the work queue and wait until it has flushed the pending etcd writes;
+//  3. write the final scheduler / version snapshots synchronously;
+//  4. close the clients.
+//
+// Earlier versions called p.ctx.Done() (which only returns a channel and cancels nothing)
+// and then closed the queue channel, so SyncLoop kept spinning on nil values from the closed channel.
 func (p *program) Stop() error {
 	log.Info("gpu-docker-routers is stopping...")
-	p.ctx.Done()
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if p.srv != nil {
+		if err := p.srv.Shutdown(shutdownCtx); err != nil {
+			log.Errorf("http server shutdown: %v", err)
+		}
+	}
+
+	p.cancel()
 	p.wg.Wait()
 
-	workQueue.Close()
-	docker.CloseDockerClient()
 	_ = schedulers.CloseGpuScheduler()
 	_ = schedulers.ClosePortScheduler()
 	_ = version.CloseVersionMap()
 	_ = version.CloseMergedMap()
+	docker.CloseDockerClient()
 	_ = etcd.CloseEtcdClient()
 	log.Info("gpu-docker-routers stopped successfully!")
 	return nil

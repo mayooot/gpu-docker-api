@@ -2,22 +2,24 @@ package utils
 
 import (
 	"context"
-	"fmt"
+	"os/exec"
 
-	"github.com/commander-cli/cmd"
 	"github.com/pkg/errors"
 
 	"github.com/mayooot/gpu-docker-api/internal/docker"
 )
 
-var (
-	cpRFPOption = "cp -rf -p %s/* %s/"
-)
-
+// CopyDir copies everything under src into dest.
+//
+// Earlier versions ran `cp -rf -p src/* dest/` through a shell. The `*` glob skips
+// dotfiles at the top level (e.g. /root/.bashrc, /root/.cache, /root/.conda), which are exactly
+// the user state this project promises to keep. `cp -a src/. dest/` copies hidden files and
+// also preserves symlinks, ownership, timestamps and xattrs. It is executed without a shell,
+// so paths are not subject to word splitting or globbing.
 func CopyDir(src, dest string) error {
-	command := fmt.Sprintf(cpRFPOption, src, dest)
-	if err := cmd.NewCommand(command).Execute(); err != nil {
-		return errors.Wrapf(err, "cmd.Execute failed, command %s, src:%s, dest: %s", command, src, dest)
+	out, err := exec.Command("cp", "-a", src+"/.", dest+"/").CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "cp -a failed, src: %s, dest: %s, output: %s", src, dest, out)
 	}
 	return nil
 }
